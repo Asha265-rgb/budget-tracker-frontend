@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { colors } from '../../styles/colors';
-import { spacing } from '../../styles/spacing';
-import { typography } from '../../styles/typography';
+import { colors } from '../styles/colors';
+import { spacing } from '../styles/spacing';
+import { typography } from '../styles/typography';
+import { Footer, Header } from '../components/Layout';
 
 const ContactUs: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -75,10 +76,11 @@ const ContactUs: React.FC = () => {
   const primaryColor = colors.primary[500];
 
   return (
-    <div style={{ 
+    <div style={{
       minHeight: '100vh',
       background: 'linear-gradient(135deg, #fff5f7 0%, #ffffff 100%)'
     }}>
+      <Header />
       <section style={{
         padding: `${spacing[6]} ${spacing[6]} ${spacing[6]}`,
         textAlign: 'center',
@@ -109,8 +111,8 @@ const ContactUs: React.FC = () => {
         padding: `${spacing[8]} ${spacing[6]}`,
         backgroundColor: 'white'
       }}>
-        <div style={{ 
-          maxWidth: '1200px', 
+        <div style={{
+          maxWidth: '1200px',
           margin: '0 auto',
           display: 'grid',
           gridTemplateColumns: '1fr 1fr',
@@ -371,6 +373,7 @@ const ContactUs: React.FC = () => {
           </div>
         </div>
       </section>
+      <Footer />
     </div>
   );
 };

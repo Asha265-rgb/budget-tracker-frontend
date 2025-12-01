@@ -1,7 +1,8 @@
 import React from 'react';
-import { colors } from '../../styles/colors';
-import { spacing } from '../../styles/spacing';
-import { typography } from '../../styles/typography';
+import { colors } from '../styles/colors';
+import { spacing } from '../styles/spacing';
+import { typography } from '../styles/typography';
+import { Footer, Header } from '../components/Layout';
 
 const AboutUs: React.FC = () => {
   const teamMembers = [
@@ -70,6 +71,7 @@ const AboutUs: React.FC = () => {
       minHeight: '100vh',
       background: 'linear-gradient(135deg, #fff5f7 0%, #ffffff 100%)'
     }}>
+      <Header />
       {/* Hero Section */}
       <section style={{
         padding: `${spacing[12]} ${spacing[6]} ${spacing[8]}`,
@@ -352,6 +354,7 @@ const AboutUs: React.FC = () => {
           </div>
         </div>
       </section>
+      <Footer />
     </div>
   );
 };

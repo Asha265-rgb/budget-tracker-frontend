@@ -5,12 +5,12 @@ import { colors } from './styles/colors';
 import { typography } from './styles/typography';
 
 // Import only the pages we've actually built
-import LandingPage from './features/landing/LandingPage';
-import LoginPage from './features/auth/LoginPage';
-import RegisterPage from './features/auth/RegisterPage';
-import ForgotPassword from './features/auth/ForgotPassword';
-import AboutUs from './features/landing/AboutUs';
-import ContactUs from './features/landing/ContactUs';
+import LandingPage from './pages/LandingPage';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import ForgotPassword from './pages/ForgotPassword';
+import AboutUs from './pages/AboutUs';
+import ContactUs from './pages/ContactUs';
 import DashboardMain from './components/Dashboard/DashboardMain';
 
 function App() {

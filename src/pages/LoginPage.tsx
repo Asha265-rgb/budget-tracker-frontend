@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { colors } from '../../styles/colors';
-import { spacing } from '../../styles/spacing';
-import { typography } from '../../styles/typography';
-import Header from '../../components/Layout/Header';
-import Footer from '../../components/Layout/Footer';
+import { colors } from '../styles/colors';
+import { spacing } from '../styles/spacing';
+import { typography } from '../styles/typography';
+import Header from '../components/Layout/Header';
+import Footer from '../components/Layout/Footer';
 
 const LoginPage: React.FC = () => {
   const [formData, setFormData] = useState({

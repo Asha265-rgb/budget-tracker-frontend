@@ -1,12 +1,12 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { colors } from '../../styles/colors';
-import { spacing } from '../../styles/spacing';
-import { typography } from '../../styles/typography';
+import { colors } from '../styles/colors';
+import { spacing } from '../styles/spacing';
+import { typography } from '../styles/typography';
 
 // Updated import path - removed "images/" folder and fixed extension
 import heroImage from '../../assets/landing-hero.png';
-import { Header } from '../../components/Layout';
+import { Header } from '../components/Layout';
 
 const LandingPage: React.FC = () => {
   const features = [
