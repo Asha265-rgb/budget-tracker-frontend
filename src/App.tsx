@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Provider } from 'react-redux';
-import { store } from './store';
+import { store } from './app/store';
 import { colors } from './styles/colors';
 import { typography } from './styles/typography';
 
@@ -18,7 +18,7 @@ function App() {
     <Provider store={store}>
       <Router>
         <div style={{
-          minHeight: '100vh',
+          minHeight: 'h-screen',
           backgroundColor: colors.background.primary,
           color: colors.text.primary,
           fontFamily: typography.fontFamily.primary,

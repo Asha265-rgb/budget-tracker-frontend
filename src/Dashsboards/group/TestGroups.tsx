@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { groupsAPI, groupMembersAPI, groupExpensesAPI } from '../services/api';
+import { groupsAPI, groupMembersAPI, groupExpensesAPI } from '../../services/api';
 
 interface Group {
   id: string;

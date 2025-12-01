@@ -6,6 +6,7 @@ import { typography } from '../../styles/typography';
 
 // Updated import path - removed "images/" folder and fixed extension
 import heroImage from '../../assets/landing-hero.png';
+import { Header } from '../../components/Layout';
 
 const LandingPage: React.FC = () => {
   const features = [
@@ -66,9 +67,10 @@ const LandingPage: React.FC = () => {
 
   return (
     <div style={{ 
-      minHeight: '100vh',
+      minHeight: 'h-screen',
       background: 'linear-gradient(135deg, #fff5f7 0%, #ffffff 100%)'
     }}>
+      <Header />
       {/* Hero Section */}
       <section style={{
         padding: `${spacing[16]} ${spacing[6]}`,

@@ -2,7 +2,7 @@ import React from 'react';
 import { colors } from '../../styles/colors';
 import { spacing } from '../../styles/spacing';
 import { typography } from '../../styles/typography';
-import Card from '../Common/Card';
+import Card from '../../components/Common/Card';
 
 interface BusinessDashboardProps {
   userName: string;

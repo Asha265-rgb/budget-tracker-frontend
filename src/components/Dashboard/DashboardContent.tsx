@@ -1,7 +1,7 @@
 ﻿import React from 'react';
-import PersonalDashboard from './PersonalDashboard';
-import BusinessDashboard from './BusinessDashboard';
-import GroupDashboard from './GroupDashboard';
+import PersonalDashboard from '../../Dashsboards/personal_user/PersonalDashboard';
+import BusinessDashboard from '../../Dashsboards/business/BusinessDashboard';
+import GroupDashboard from '../../Dashsboards/group/GroupDashboard';
 
 const DashboardContent: React.FC = () => {
   // Get user role from localStorage (set during login)

@@ -2,9 +2,9 @@ import React from 'react';
 import { colors } from '../../styles/colors';
 import { spacing } from '../../styles/spacing';
 import { typography } from '../../styles/typography';
-import Card from '../Common/Card';
-import FinancialCards from './FinancialCards';
-import RecentTransactions from './RecentTransactions';
+import Card from '../../components/Common/Card';
+import FinancialCards from '../../components/Dashboard/FinancialCards';
+import RecentTransactions from '../../components/Dashboard/RecentTransactions';
 
 interface PersonalDashboardProps {
   userName: string;
