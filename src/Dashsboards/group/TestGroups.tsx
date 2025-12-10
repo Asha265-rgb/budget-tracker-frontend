@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { groupsAPI, groupMembersAPI, groupExpensesAPI } from '../../services/api';
+import axios from 'axios';
 
 interface Group {
   id: string;
@@ -60,6 +60,45 @@ interface ApiResponse<T> {
   status?: number;
   statusText?: string;
 }
+
+// Create axios instance
+const axiosInstance = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000/api',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Add token interceptor
+axiosInstance.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Create API objects
+const groupsAPI = {
+  getUserGroups: (userId: string) => axiosInstance.get(`/groups/user/${userId}`),
+  createGroup: (groupData: any) => axiosInstance.post('/groups', groupData),
+  getGroupBalance: (groupId: string) => axiosInstance.get(`/groups/${groupId}/balance`),
+  addMember: (groupId: string, userId: string, role: string) => 
+    axiosInstance.post(`/groups/${groupId}/members`, { userId, role }),
+  acceptInvite: (groupId: string, userId: string) => 
+    axiosInstance.post(`/groups/${groupId}/accept`, { userId }),
+  deleteGroup: (groupId: string) => axiosInstance.delete(`/groups/${groupId}`)
+};
+
+const groupMembersAPI = {
+  getGroupMembers: (groupId: string) => axiosInstance.get(`/groups/${groupId}/members`)
+};
+
+const groupExpensesAPI = {
+  getGroupExpenses: (groupId: string) => axiosInstance.get(`/groups/${groupId}/expenses`),
+  createExpense: (expenseData: any) => 
+    axiosInstance.post(`/groups/${expenseData.groupId}/expenses`, expenseData)
+};
 
 const TestGroups: React.FC = () => {
   const [groups, setGroups] = useState<Group[]>([]);

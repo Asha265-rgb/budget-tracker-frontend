@@ -1,0 +1,447 @@
+// src/features/groups/SimpleInvitationsPanel.tsx
+import React, { useState } from 'react';
+import { Mail, Check, X, RefreshCw, UserPlus, AlertCircle, Clock, User, Shield } from 'lucide-react';
+import { toast } from 'sonner';
+import {
+  useGetGroupInvitationsQuery,
+  useApproveInvitationMutation,
+  useRejectInvitationMutation,
+  useCancelInvitationMutation,
+  useResendInvitationMutation,
+} from './groupsApi';
+import MemberInviteModal from './MemberInviteModal';
+
+interface SimpleInvitationsPanelProps {
+  groupId: string;
+  groupName: string;
+  isAdmin: boolean;
+  currentUserId: string;
+}
+
+const SimpleInvitationsPanel: React.FC<SimpleInvitationsPanelProps> = ({
+  groupId,
+  groupName,
+  isAdmin,
+  currentUserId,
+}) => {
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+  
+  const { 
+    data: invitations = [], 
+    isLoading, 
+    refetch,
+    error 
+  } = useGetGroupInvitationsQuery(groupId);
+  
+  const [approveInvitation, { isLoading: isApproving }] = useApproveInvitationMutation();
+  const [rejectInvitation, { isLoading: isRejecting }] = useRejectInvitationMutation();
+  const [cancelInvitation, { isLoading: isCancelling }] = useCancelInvitationMutation();
+  const [resendInvitation, { isLoading: isResending }] = useResendInvitationMutation();
+
+  // Handle API errors
+  if (error) {
+    console.error('Error fetching invitations:', error);
+    
+    return (
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-yellow-100 rounded-lg">
+              <AlertCircle className="h-6 w-6 text-yellow-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Group Invitations</h3>
+              <p className="text-sm text-gray-600">Invite members to join your group</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setIsInviteModalOpen(true)}
+            className="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg hover:shadow-lg flex items-center gap-2 transition-all"
+          >
+            <UserPlus className="h-4 w-4" />
+            Invite Member
+          </button>
+        </div>
+        
+        <div className="text-center py-8 bg-yellow-50 rounded-lg">
+          <AlertCircle className="h-12 w-12 text-yellow-500 mx-auto mb-3" />
+          <p className="text-gray-700 font-medium">Invitations feature not available</p>
+          <p className="text-sm text-gray-500 mt-1">
+            You can still invite members, but pending invitations won't be displayed here.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const pendingInvitations = invitations.filter(
+    inv => inv.status === 'pending' || inv.status === 'sent'
+  );
+  
+  const acceptedInvitations = invitations.filter(
+    inv => inv.status === 'accepted' || inv.status === 'approved'
+  );
+  
+  const rejectedInvitations = invitations.filter(
+    inv => inv.status === 'rejected' || inv.status === 'cancelled' || inv.status === 'expired'
+  );
+
+  const displayInvitations = showAll ? invitations : pendingInvitations;
+
+  const handleApprove = async (invitationId: string) => {
+    try {
+      await approveInvitation({ invitationId }).unwrap();
+      toast.success('Invitation approved!');
+      refetch();
+    } catch (error: any) {
+      console.error('Failed to approve:', error);
+      toast.error(error?.data?.message || 'Failed to approve invitation');
+    }
+  };
+
+  const handleReject = async (invitationId: string) => {
+    try {
+      await rejectInvitation({ invitationId }).unwrap();
+      toast.success('Invitation rejected');
+      refetch();
+    } catch (error: any) {
+      console.error('Failed to reject:', error);
+      toast.error(error?.data?.message || 'Failed to reject invitation');
+    }
+  };
+
+  const handleCancel = async (invitationId: string) => {
+    try {
+      await cancelInvitation(invitationId).unwrap();
+      toast.success('Invitation cancelled');
+      refetch();
+    } catch (error: any) {
+      console.error('Failed to cancel:', error);
+      toast.error(error?.data?.message || 'Failed to cancel invitation');
+    }
+  };
+
+  const handleResend = async (invitationId: string) => {
+    try {
+      await resendInvitation(invitationId).unwrap();
+      toast.success('Invitation resent!');
+      refetch();
+    } catch (error: any) {
+      console.error('Failed to resend:', error);
+      toast.error(error?.data?.message || 'Failed to resend invitation');
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return (
+          <span className="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">
+            <Clock className="h-3 w-3 inline mr-1" />
+            Pending
+          </span>
+        );
+      case 'sent':
+        return (
+          <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+            <Mail className="h-3 w-3 inline mr-1" />
+            Sent
+          </span>
+        );
+      case 'approved':
+      case 'accepted':
+        return (
+          <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+            <Check className="h-3 w-3 inline mr-1" />
+            Accepted
+          </span>
+        );
+      case 'rejected':
+        return (
+          <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">
+            <X className="h-3 w-3 inline mr-1" />
+            Rejected
+          </span>
+        );
+      case 'cancelled':
+        return (
+          <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">
+            Cancelled
+          </span>
+        );
+      case 'expired':
+        return (
+          <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">
+            Expired
+          </span>
+        );
+      default:
+        return (
+          <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">
+            {status}
+          </span>
+        );
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) {
+      return 'Today';
+    } else if (diffDays === 1) {
+      return 'Yesterday';
+    } else if (diffDays < 7) {
+      return `${diffDays} days ago`;
+    } else {
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+      });
+    }
+  };
+
+  const getRoleIcon = (role: string) => {
+    return role === 'admin' ? (
+      <Shield className="h-4 w-4 text-purple-500" />
+    ) : (
+      <User className="h-4 w-4 text-gray-500" />
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <Mail className="h-6 w-6 text-blue-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Group Invitations</h3>
+              <p className="text-sm text-gray-600">Loading invitations...</p>
+            </div>
+          </div>
+          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
+        </div>
+        <div className="text-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="text-gray-500 mt-3">Loading invitations...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="bg-white rounded-xl border border-gray-200">
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg">
+                <Mail className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Group Invitations</h3>
+                <p className="text-sm text-gray-600">
+                  Manage member invitations
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => refetch()}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Refresh invitations"
+              >
+                <RefreshCw className="h-5 w-5 text-gray-500" />
+              </button>
+              <button
+                onClick={() => setIsInviteModalOpen(true)}
+                className="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg hover:shadow-lg flex items-center gap-2 transition-all"
+              >
+                <UserPlus className="h-4 w-4" />
+                Invite Member
+              </button>
+            </div>
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-4 gap-4 mt-6">
+            <div className="text-center">
+              <p className="text-2xl font-bold text-gray-900">{invitations.length}</p>
+              <p className="text-sm text-gray-600">Total</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-yellow-600">{pendingInvitations.length}</p>
+              <p className="text-sm text-gray-600">Pending</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-green-600">{acceptedInvitations.length}</p>
+              <p className="text-sm text-gray-600">Accepted</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-red-600">{rejectedInvitations.length}</p>
+              <p className="text-sm text-gray-600">Rejected</p>
+            </div>
+          </div>
+
+          {/* Toggle */}
+          <div className="flex gap-4 mt-4">
+            <button
+              onClick={() => setShowAll(false)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
+                !showAll
+                  ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              Pending ({pendingInvitations.length})
+            </button>
+            <button
+              onClick={() => setShowAll(true)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
+                showAll
+                  ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              All ({invitations.length})
+            </button>
+          </div>
+        </div>
+
+        <div className="p-6">
+          {displayInvitations.length === 0 ? (
+            <div className="text-center py-8">
+              <Mail className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-500 font-medium">No invitations yet</p>
+              <p className="text-sm text-gray-400 mt-1">
+                {showAll 
+                  ? 'No invitations have been sent yet'
+                  : 'No pending invitations. All invitations have been processed.'
+                }
+              </p>
+              <button
+                onClick={() => setIsInviteModalOpen(true)}
+                className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2 mx-auto"
+              >
+                <UserPlus className="h-4 w-4" />
+                Invite Your First Member
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {displayInvitations.map((invitation) => (
+                <div
+                  key={invitation.id}
+                  className="p-4 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center gap-2">
+                          {getRoleIcon(invitation.role)}
+                          <span className="font-medium text-gray-900">{invitation.inviteeEmail}</span>
+                        </div>
+                        {getStatusBadge(invitation.status)}
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-sm text-gray-600 mt-2">
+                        <div className="flex items-center gap-1">
+                          <span className="font-medium">Role:</span>
+                          <span className="font-semibold">{invitation.role}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="font-medium">Invited:</span>
+                          <span>{formatDate(invitation.createdAt)}</span>
+                        </div>
+                        {invitation.inviteeName && (
+                          <div className="flex items-center gap-1">
+                            <span className="font-medium">Name:</span>
+                            <span>{invitation.inviteeName}</span>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {invitation.message && (
+                        <div className="mt-2 text-sm text-gray-500 bg-gray-50 p-2 rounded-lg">
+                          <span className="font-medium">Message:</span> "{invitation.message}"
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Actions */}
+                    {isAdmin && (
+                      <div className="flex gap-2 flex-wrap">
+                        {(invitation.status === 'sent' || invitation.status === 'pending') && (
+                          <>
+                            <button
+                              onClick={() => handleApprove(invitation.id)}
+                              disabled={isApproving}
+                              className="px-3 py-1.5 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 font-medium text-sm disabled:opacity-50 flex items-center gap-1"
+                              title="Approve invitation"
+                            >
+                              <Check className="h-4 w-4" />
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => handleReject(invitation.id)}
+                              disabled={isRejecting}
+                              className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 font-medium text-sm disabled:opacity-50 flex items-center gap-1"
+                              title="Reject invitation"
+                            >
+                              <X className="h-4 w-4" />
+                              Reject
+                            </button>
+                          </>
+                        )}
+                        
+                        {(invitation.status === 'sent' || invitation.status === 'pending') && (
+                          <button
+                            onClick={() => handleCancel(invitation.id)}
+                            disabled={isCancelling}
+                            className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium text-sm disabled:opacity-50"
+                            title="Cancel invitation"
+                          >
+                            Cancel
+                          </button>
+                        )}
+                        
+                        {invitation.status !== 'accepted' && invitation.status !== 'approved' && (
+                          <button
+                            onClick={() => handleResend(invitation.id)}
+                            disabled={isResending}
+                            className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 font-medium text-sm disabled:opacity-50"
+                            title="Resend invitation"
+                          >
+                            Resend
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Invite Modal */}
+      <MemberInviteModal
+        isOpen={isInviteModalOpen}
+        onClose={() => setIsInviteModalOpen(false)}
+        groupId={groupId}
+        groupName={groupName}
+        refetchInvitations={refetch}
+      />
+    </>
+  );
+};
+
+export default SimpleInvitationsPanel;

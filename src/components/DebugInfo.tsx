@@ -1,32 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { usersAPI, accountsAPI } from '../services/api';
+import { useSelector } from 'react-redux';
+import { useGetProfileQuery } from '../features/user/userApi';
+import { useGetAccountsQuery } from '../features/accounts/accountsApi';
+import type { RootState } from '../app/store';
 
 const DebugInfo: React.FC = () => {
+  const { user } = useSelector((state: RootState) => state.auth);
+  const { data: userData, isLoading: userLoading, refetch: refetchUser } = useGetProfileQuery();
+  const { data: accounts = [], isLoading: accountsLoading, refetch: refetchAccounts } = useGetAccountsQuery(user?.id || '');
   const [userInfo, setUserInfo] = useState<any>(null);
-  const [accounts, setAccounts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  // Get user profile and accounts
-  const fetchUserData = async () => {
-    setLoading(true);
-    try {
-      // Get user profile
-      const userResponse = await usersAPI.getProfile();
-      const user = userResponse.data;
-      setUserInfo(user);
-      
-      // Get user's accounts
-      const accountsResponse = await accountsAPI.getAccounts(user.id);
-      setAccounts(accountsResponse.data);
-      
-      console.log('User Info:', user);
-      console.log('Accounts:', accountsResponse.data);
-    } catch (error) {
-      console.error('Error fetching user data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [accountList, setAccountList] = useState<any[]>([]);
 
   // Check localStorage for token
   const checkAuth = () => {
@@ -36,11 +19,25 @@ const DebugInfo: React.FC = () => {
   };
 
   useEffect(() => {
-    checkAuth();
-    fetchUserData();
-  }, []);
+    if (userData) {
+      setUserInfo(userData);
+    }
+  }, [userData]);
 
-  if (loading) {
+  useEffect(() => {
+    if (accounts) {
+      setAccountList(accounts);
+    }
+  }, [accounts]);
+
+  const fetchAllData = () => {
+    refetchUser();
+    if (user?.id) {
+      refetchAccounts();
+    }
+  };
+
+  if (userLoading || accountsLoading) {
     return <div style={{ padding: '20px', border: '1px solid #ccc', margin: '10px' }}>
       <h3>Loading debug info...</h3>
     </div>;
@@ -51,7 +48,7 @@ const DebugInfo: React.FC = () => {
       <h3>🔧 Debug Information</h3>
       
       <div style={{ marginBottom: '20px' }}>
-        <button onClick={fetchUserData} style={{ marginRight: '10px' }}>
+        <button onClick={fetchAllData} style={{ marginRight: '10px' }}>
           Refresh Data
         </button>
         <button onClick={checkAuth}>
@@ -77,10 +74,10 @@ const DebugInfo: React.FC = () => {
       )}
 
       {/* Accounts Information */}
-      {accounts.length > 0 && (
+      {accountList.length > 0 && (
         <div style={{ padding: '10px', border: '1px solid #ddd', backgroundColor: 'white' }}>
-          <h4>💰 Accounts ({accounts.length})</h4>
-          {accounts.map(account => (
+          <h4>💰 Accounts ({accountList.length})</h4>
+          {accountList.map(account => (
             <div key={account.id} style={{ 
               margin: '10px 0', 
               padding: '10px', 

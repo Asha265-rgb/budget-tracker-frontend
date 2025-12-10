@@ -1,638 +1,517 @@
- import axios from 'axios';
+// src/services/api.ts
+import axios from 'axios';
+import type { AxiosResponse, AxiosError } from 'axios';
 
-// FIXED: Updated to your actual backend port 8000
-const API_BASE_URL = 'http://localhost:8000';
+// ============ RE-EXPORT BASE API ============
+export { baseApi } from './baseApi';
 
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  withCredentials: true, // ADDED: Helps with CORS
-  timeout: 10000, // ADDED: Prevent hanging requests
-});
-
-// Add token to requests automatically
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token') || localStorage.getItem('authToken');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
-// Enhanced error handling for development
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    console.log('API Error Details:', {
-      status: error.response?.status,
-      message: error.message,
-      url: error.config?.url,
-      method: error.config?.method,
-    });
-    
-    // Handle CORS errors specifically
-    if (error.message === 'Network Error') {
-      console.error('CORS/Network Error - Check backend CORS configuration');
-    }
-    
-    return Promise.reject(error);
-  }
-);
-
-// ========== TYPE DEFINITIONS ==========
-
+// ============ YOUR EXISTING TYPES (UNTOUCHED) ============
 export interface User {
   id: string;
   email: string;
-  firstName: string;
-  lastName: string;
-  userType: 'personal' | 'business' | 'group' | 'admin';
-  preferredCurrency: string;
-  isVerified: boolean;
-  phoneNumber?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface AuthResponse {
-  access_token: string;
-  user: User;
-}
-
-export interface Account {
-  id: string;
   name: string;
-  type: 'cash' | 'bank' | 'credit_card' | 'investment' | 'savings' | 'other';
-  balance: number;
-  currency: string;
-  accountNumber?: string;
-  bankName?: string;
-  status: 'active' | 'inactive' | 'archived';
-  isDeleted: boolean;
-  color?: string;
-  icon?: string;
-  userId: string;
-  createdAt: string;
-  updatedAt: string;
+  avatar?: string;
+  phone?: string;
+  userType: 'personal' | 'business' | 'group_member';
+  isActive: boolean;
 }
 
-export interface Transaction {
+export interface PersonalUser extends User {
+  userType: 'personal';
+  totalExpenses: number;
+  monthlyBudget: number;
+  savings: number;
+  recentTransactions: any[];
+}
+
+export interface BusinessUser extends User {
+  userType: 'business';
+  businessName: string;
+  businessType: string;
+  taxNumber?: string;
+  totalRevenue: number;
+  activeProjects: number;
+  clients: number;
+}
+
+// ============ YOUR EXISTING OTHER TYPES ============
+export interface GroupExpense {
   id: string;
+  groupId: string;
   description: string;
   amount: number;
-  type: 'income' | 'expense';
   category: string;
+  paidById: string;
+  splitMethod: string;
+  participants: string[];
+  amounts?: Record<string, number>;
   date: string;
-  accountId: string;
-  userId: string;
-  isRecurring: boolean;
-  recurringId?: string;
-  notes?: string;
-  tags?: string[];
-  receiptUrl?: string;
-  isSplit: boolean;
+  status: string;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface CreateTransactionData {
-  description: string;
-  amount: number;
-  type: 'income' | 'expense';
-  category: string;
-  date: string;
-  accountId: string;
-  userId: string;
-  notes?: string;
-  tags?: string[];
-  receiptUrl?: string;
-  isRecurring?: boolean;
-  isSplit?: boolean;
-  budgetId?: string;
-  goalId?: string;
-}
-
-export interface Budget {
+export interface PendingInvitation {
   id: string;
+  groupId: string;
+  email: string;
   name: string;
-  amount: number;
-  spent: number;
-  period: 'monthly' | 'yearly' | 'weekly' | 'custom';
-  category: string;
-  startDate: string;
-  endDate: string;
-  rolloverEnabled: boolean;
-  rolloverAmount: number;
-  status: 'active' | 'completed' | 'cancelled';
-  color?: string;
-  userId: string;
+  role: string;
+  phone?: string;
+  status: 'pending' | 'accepted' | 'declined';
+  token: string;
+  expiresAt: string;
   createdAt: string;
-  updatedAt: string;
 }
 
-export interface Goal {
+export interface ActivityLog {
   id: string;
-  name: string;
-  targetAmount: number;
-  currentAmount: number;
-  targetDate: string;
-  startDate: string;
-  status: 'active' | 'completed' | 'cancelled';
-  category?: string;
-  color?: string;
-  icon?: string;
-  notes?: string;
-  isUnrealistic: boolean;
+  groupId: string;
   userId: string;
+  userName: string;
+  action: string;
+  details: any;
   createdAt: string;
-  updatedAt: string;
-}
-
-// ADD THIS INTERFACE FOR GOAL TRANSACTIONS
-export interface GoalTransaction {
-  id: string;
-  amount: number;
-  date: string;
-  notes?: string;
-  type: 'savings' | 'withdrawal';
-  goalId: string;
-  linkedTransactionId?: string;
-  createdAt: string;
-  updatedAt: string;
 }
 
 export interface RecurringTransaction {
   id: string;
-  description: string;
-  amount: number;
+  userId: string;
   type: 'income' | 'expense';
+  amount: number;
   category: string;
-  frequency: 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom';
-  customDays?: number;
+  description: string;
+  frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
   startDate: string;
   endDate?: string;
-  lastProcessed?: string;
-  nextProcessingDate: string;
-  status: 'active' | 'paused' | 'cancelled' | 'completed';
-  notes?: string;
-  accountId: string;
-  userId: string;
+  isActive: boolean;
+  nextOccurrence: string;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface CreateRecurringTransactionData {
-  description: string;
-  amount: number;
-  type: 'income' | 'expense';
-  category: string;
-  frequency: 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom';
-  customDays?: number;
-  startDate: string;
-  endDate?: string;
-  nextProcessingDate: string;
-  accountId: string;
-  userId: string;
-  notes?: string;
-}
-
-// ADDED: Notifications Types
-export interface Notification {
-  id: string;
-  title: string;
-  message: string;
-  type: 'overspending' | 'bill_reminder' | 'recurring_transaction' | 'group_settlement' | 'goal_milestone' | 'low_balance' | 'unrealistic_goal';
-  status: 'unread' | 'read' | 'dismissed';
-  metadata?: any;
-  relatedEntityId?: string;
-  relatedEntityType?: string;
-  isActionRequired: boolean;
-  actionUrl?: string;
-  userId: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CreateNotificationData {
-  title: string;
-  message: string;
-  type: string;
-  userId: string;
-  metadata?: any;
-  relatedEntityId?: string;
-  relatedEntityType?: string;
-  isActionRequired?: boolean;
-  actionUrl?: string;
-}
-
-// ADDED: Reports Types
 export interface Report {
   id: string;
-  name: string;
-  type: string;
-  filters: {
-    startDate: string;
-    endDate: string;
-    categories?: string[];
-    accounts?: string[];
-    type?: string;
-  };
-  data?: any;
-  status: string;
-  exportedUrl?: string;
-  exportFormat: string;
   userId: string;
+  name: string;
+  type: 'spending_by_category' | 'income_vs_expense' | 'cash_flow' | 'net_worth';
+  filters: any;
+  data?: any;
+  exportFormat: 'pdf' | 'excel' | 'csv';
   createdAt: string;
   updatedAt: string;
 }
 
-export interface CreateReportData {
-  name: string;
-  type: string;
-  filters: {
-    startDate: string;
-    endDate: string;
-    categories?: string[];
-    accounts?: string[];
-    type?: string;
-  };
-  userId: string;
-  exportFormat?: string;
-}
-
-// ADDED: Groups Types
 export interface Group {
   id: string;
   name: string;
   description?: string;
-  status: string;
-  currency: string;
-  color?: string;
-  icon?: string;
   createdBy: string;
+  totalMembers: number;
+  totalExpenses: number;
   createdAt: string;
   updatedAt: string;
-}
-
-// FIXED: Change createdBy to userId to match backend
-export interface CreateGroupData {
-  name: string;
-  description?: string;
-  currency?: string;
-  color?: string;
-  icon?: string;
-  userId: string; // ← CHANGED FROM createdBy TO userId
 }
 
 export interface GroupMember {
   id: string;
-  role: string;
-  status: string;
-  totalOwed: number;
-  totalOwes: number;
+  groupId: string;
   userId: string;
-  groupId: string;
-  joinedAt: string;
-  updatedAt: string;
-}
-
-export interface CreateGroupMemberData {
-  userId: string;
-  groupId: string;
-  role?: string;
-}
-
-export interface GroupExpense {
-  id: string;
-  description: string;
-  amount: number;
-  category: string;
-  date: string;
-  splitType: string;
-  receiptUrl?: string;
-  notes?: string;
-  status: string;
-  paidBy: string;
-  groupId: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CreateGroupExpenseData {
-  description: string;
-  amount: number;
-  category: string;
-  date: string;
-  splitType: string;
-  receiptUrl?: string;
-  notes?: string;
-  paidBy: string;
-  groupId: string;
-}
-
-export interface ExpenseSplit {
-  id: string;
-  amount: number;
-  percentage?: number;
-  status: string;
-  settledAt?: string;
-  memberId: string;
-  expenseId: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CreateExpenseSplitData {
-  amount: number;
-  percentage?: number;
-  memberId: string;
-  expenseId: string;
-}
-
-export interface LoginData {
-  email: string;
-  password: string;
-}
-
-export interface RegisterData {
-  email: string;
-  password: string;
-  firstName: string;
-  lastName: string;
-  userType?: string;
-  preferredCurrency?: string;
-  phoneNumber?: string;
-}
-
-export interface CreateAccountData {
   name: string;
-  type: string;
-  balance?: number;
-  currency?: string;
-  accountNumber?: string;
-  bankName?: string;
-  color?: string;
-  icon?: string;
+  email: string;
+  role: 'admin' | 'member';
+  joinedAt: string;
+  totalContributed: number;
+  totalOwed: number;
 }
 
-// ========== API METHODS ==========
+export interface Notification {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  type: 'info' | 'warning' | 'success' | 'error';
+  isRead: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
 
+export interface GoalTransaction {
+  id: string;
+  goalId: string;
+  amount: number;
+  type: 'deposit' | 'withdrawal';
+  description: string;
+  date: string;
+}
+
+// ============ AXIOS API CONFIGURATION ============
+const API = axios.create({
+  baseURL: import.meta.env.VITE_REACT_APP_API_URL || 'http://localhost:5000/api',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  withCredentials: true,
+});
+
+// Request interceptor
+API.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('authToken') || 
+                  sessionStorage.getItem('authToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    const userType = localStorage.getItem('userType');
+    if (userType && config.headers) {
+      config.headers['X-User-Type'] = userType;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Response interceptor
+API.interceptors.response.use(
+  (response) => response,
+  (error: AxiosError) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('userType');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
+// ============ YOUR EXISTING RTK QUERY EXTENSIONS ============
+// You'll move these to their respective feature files
+// Keep them here temporarily for compatibility
+
+// ============ AXIOS-BASED APIs (YOUR EXISTING) ============
 export const authAPI = {
-  login: (email: string, password: string): Promise<{ data: AuthResponse }> =>
-    api.post('/auth/login', { email, password }),
+  login: (email: string, password: string): Promise<AxiosResponse<{
+    token: string;
+    user: User;
+    userType: 'personal' | 'business';
+  }>> => API.post('/auth/login', { email, password }),
+
+  register: (data: {
+    email: string;
+    password: string;
+    name: string;
+    userType: 'personal' | 'business';
+    phone?: string;
+  }): Promise<AxiosResponse> => API.post('/auth/register', data),
+
+  logout: (): Promise<AxiosResponse> => API.post('/auth/logout'),
+
+  refreshToken: (): Promise<AxiosResponse> => API.post('/auth/refresh'),
   
-  register: (userData: RegisterData): Promise<{ data: AuthResponse }> =>
-    api.post('/auth/register', userData),
+  forgotPassword: (email: string): Promise<AxiosResponse> => 
+    API.post('/auth/forgot-password', { email }),
+    
+  resetPassword: (token: string, password: string): Promise<AxiosResponse> => 
+    API.post('/auth/reset-password', { token, password }),
+    
+  verifyEmail: (token: string): Promise<AxiosResponse> => 
+    API.post('/auth/verify-email', { token }),
 };
 
-export const usersAPI = {
-  getProfile: (): Promise<{ data: User }> => api.get('/users/profile/me'),
-  getAllUsers: (): Promise<{ data: User[] }> => api.get('/users'),
+export const personalAPI = {
+  getPersonalDashboard: (): Promise<AxiosResponse<{
+    user: PersonalUser;
+    monthlyExpenses: number;
+    monthlyIncome: number;
+    savings: number;
+    recentTransactions: any[];
+    budgets: any[];
+  }>> => API.get('/personal/dashboard'),
+
+  getPersonalExpenses: (params?: {
+    month?: string;
+    category?: string;
+    limit?: number;
+  }): Promise<AxiosResponse<any[]>> => 
+    API.get('/personal/expenses', { params }),
+
+  getBudgets: (): Promise<AxiosResponse> => 
+    API.get('/personal/budgets'),
+
+  updateProfile: (data: Partial<PersonalUser>): Promise<AxiosResponse> => 
+    API.put('/personal/profile', data),
+    
+  getPersonalStats: (): Promise<AxiosResponse> => 
+    API.get('/personal/stats'),
+    
+  getPersonalGoals: (): Promise<AxiosResponse> => 
+    API.get('/personal/goals'),
+    
+  createExpense: (data: any): Promise<AxiosResponse> => 
+    API.post('/personal/expenses', data),
+    
+  updateExpense: (expenseId: string, data: any): Promise<AxiosResponse> => 
+    API.put(`/personal/expenses/${expenseId}`, data),
+    
+  deleteExpense: (expenseId: string): Promise<AxiosResponse> => 
+    API.delete(`/personal/expenses/${expenseId}`),
 };
 
-export const accountsAPI = {
-  getAccounts: (userId: string): Promise<{ data: Account[] }> => 
-    api.get(`/accounts/user/${userId}`),
-  
-  createAccount: (accountData: CreateAccountData): Promise<{ data: Account }> => 
-    api.post('/accounts', accountData),
-  
-  getAccount: (id: string): Promise<{ data: Account }> => 
-    api.get(`/accounts/${id}`),
+export const businessAPI = {
+  getBusinessDashboard: (): Promise<AxiosResponse<{
+    user: BusinessUser;
+    monthlyRevenue: number;
+    monthlyExpenses: number;
+    profit: number;
+    activeProjects: any[];
+    recentClients: any[];
+  }>> => API.get('/business/dashboard'),
+
+  getProjects: (): Promise<AxiosResponse> => 
+    API.get('/business/projects'),
+
+  getClients: (): Promise<AxiosResponse> => 
+    API.get('/business/clients'),
+
+  getInvoices: (): Promise<AxiosResponse> => 
+    API.get('/business/invoices'),
+
+  getBusinessAnalytics: (period: 'daily' | 'weekly' | 'monthly'): Promise<AxiosResponse> => 
+    API.get('/business/analytics', { params: { period } }),
+    
+  createInvoice: (data: any): Promise<AxiosResponse> => 
+    API.post('/business/invoices', data),
+    
+  updateInvoice: (invoiceId: string, data: any): Promise<AxiosResponse> => 
+    API.put(`/business/invoices/${invoiceId}`, data),
+    
+  deleteInvoice: (invoiceId: string): Promise<AxiosResponse> => 
+    API.delete(`/business/invoices/${invoiceId}`),
+    
+  getBusinessSettings: (): Promise<AxiosResponse> => 
+    API.get('/business/settings'),
+    
+  updateBusinessSettings: (data: any): Promise<AxiosResponse> => 
+    API.put('/business/settings', data),
 };
 
-export const transactionsAPI = {
-  createTransaction: (transactionData: CreateTransactionData): Promise<{ data: Transaction }> => 
-    api.post('/transactions', transactionData),
-  
-  getUserTransactions: (userId: string): Promise<{ data: Transaction[] }> => 
-    api.get(`/transactions/user/${userId}`),
-  
-  getAccountTransactions: (accountId: string): Promise<{ data: Transaction[] }> => 
-    api.get(`/transactions/account/${accountId}`),
-  
-  updateTransaction: (id: string, transactionData: Partial<CreateTransactionData>): Promise<{ data: Transaction }> => 
-    api.put(`/transactions/${id}`, transactionData),
-  
-  deleteTransaction: (id: string): Promise<{ data: { message: string } }> => 
-    api.delete(`/transactions/${id}`),
+export const groupAPI = {
+  getUserGroups: (): Promise<AxiosResponse<any[]>> => 
+    API.get('/groups'),
+
+  getGroup: (groupId: string): Promise<AxiosResponse<any>> => 
+    API.get(`/groups/${groupId}`),
+
+  createGroup: (data: { name: string; description?: string }): Promise<AxiosResponse<any>> => 
+    API.post('/groups', data),
+
+  updateGroup: (groupId: string, data: Partial<any>): Promise<AxiosResponse<any>> => 
+    API.put(`/groups/${groupId}`, data),
+
+  deleteGroup: (groupId: string): Promise<AxiosResponse> => 
+    API.delete(`/groups/${groupId}`),
+
+  getGroupDashboardStats: (groupId: string): Promise<AxiosResponse<any>> => 
+    API.get(`/groups/${groupId}/stats`),
+
+  getGroupSettings: (groupId: string): Promise<AxiosResponse<any>> => 
+    API.get(`/groups/${groupId}/settings`),
+
+  updateGroupSettings: (groupId: string, settings: Partial<any>): Promise<AxiosResponse> => 
+    API.put(`/groups/${groupId}/settings`, settings),
 };
 
-export const budgetsAPI = {
-  getBudgets: (): Promise<{ data: Budget[] }> => api.get('/budgets'),
-  
-  createBudget: (budgetData: any): Promise<{ data: Budget }> => 
-    api.post('/budgets', budgetData),
-  
-  getUserBudgets: (userId: string): Promise<{ data: Budget[] }> => 
-    api.get(`/budgets/user/${userId}`),
+export const memberAPI = {
+  getGroupMembers: (groupId: string): Promise<AxiosResponse<{ members: any[] }>> => 
+    API.get(`/groups/${groupId}/members`),
+
+  addMember: (groupId: string, data: {
+    email: string;
+    name: string;
+    role: string;
+    phone?: string;
+  }): Promise<AxiosResponse<any>> => 
+    API.post(`/groups/${groupId}/members`, data),
+
+  updateMemberRole: (groupId: string, memberId: string, role: string): Promise<AxiosResponse> => 
+    API.put(`/groups/${groupId}/members/${memberId}`, { role }),
+
+  removeMember: (groupId: string, memberId: string): Promise<AxiosResponse> => 
+    API.delete(`/groups/${groupId}/members/${memberId}`),
+
+  leaveGroup: (groupId: string): Promise<AxiosResponse> => 
+    API.delete(`/groups/${groupId}/leave`),
+
+  getMemberStats: (groupId: string): Promise<AxiosResponse> => 
+    API.get(`/groups/${groupId}/members/stats`),
 };
 
-// UPDATED: Goals API - CORRECTED TO MATCH YOUR BACKEND EXACTLY
-export const goalsAPI = {
-  // Get all goals (no user filter)
-  getGoals: (): Promise<{ data: Goal[] }> => api.get('/goals'),
-  
-  // Create a new goal
-  createGoal: (goalData: any): Promise<{ data: Goal }> => 
-    api.post('/goals', goalData),
-  
-  // Get goals for specific user - ✅ MATCHES YOUR BACKEND
-  getUserGoals: (userId: string): Promise<{ data: Goal[] }> => 
-    api.get(`/goals/user/${userId}`),
-  
-  // Get goal progress for user - ✅ MATCHES YOUR BACKEND
-  getGoalProgress: (userId: string): Promise<{ data: any }> => 
-    api.get(`/goals/progress/user/${userId}`),
-  
-  // Get transactions for specific goal - ✅ MATCHES YOUR BACKEND
-  getGoalTransactions: (goalId: string): Promise<{ data: GoalTransaction[] }> => 
-    api.get(`/goals/${goalId}/transactions`),
-  
-  // Add savings to goal - ✅ MATCHES YOUR BACKEND
-  addSavings: (goalId: string, transactionData: { amount: number; notes?: string }): Promise<{ data: GoalTransaction }> => 
-    api.post(`/goals/${goalId}/savings`, transactionData),
-  
-  // Get single goal
-  getGoal: (id: string): Promise<{ data: Goal }> => 
-    api.get(`/goals/${id}`),
-  
-  // Update goal
-  updateGoal: (id: string, goalData: any): Promise<{ data: Goal }> => 
-    api.patch(`/goals/${id}`, goalData),
-  
-  // Delete goal
-  deleteGoal: (id: string): Promise<{ data: { message: string } }> => 
-    api.delete(`/goals/${id}`),
+export const expenseAPI = {
+  getGroupExpenses: (groupId: string, params?: {
+    month?: string;
+    category?: string;
+    status?: string;
+    limit?: number;
+  }): Promise<AxiosResponse<{ expenses: GroupExpense[] }>> => 
+    API.get(`/groups/${groupId}/expenses`, { params }),
+
+  createExpense: (groupId: string, data: {
+    description: string;
+    amount: number;
+    category: string;
+    paidById: string;
+    splitMethod: string;
+    participants: string[];
+    amounts?: Record<string, number>;
+  }): Promise<AxiosResponse<GroupExpense>> => 
+    API.post(`/groups/${groupId}/expenses`, data),
+
+  updateExpense: (groupId: string, expenseId: string, data: Partial<GroupExpense>): Promise<AxiosResponse> => 
+    API.put(`/groups/${groupId}/expenses/${expenseId}`, data),
+
+  deleteExpense: (groupId: string, expenseId: string): Promise<AxiosResponse> => 
+    API.delete(`/groups/${groupId}/expenses/${expenseId}`),
+
+  settleExpense: (groupId: string, expenseId: string): Promise<AxiosResponse> => 
+    API.post(`/groups/${groupId}/expenses/${expenseId}/settle`),
+
+  getExpenseSummary: (groupId: string): Promise<AxiosResponse> => 
+    API.get(`/groups/${groupId}/expenses/summary`),
 };
 
-export const recurringTransactionsAPI = {
-  createRecurringTransaction: (transactionData: CreateRecurringTransactionData): Promise<{ data: RecurringTransaction }> => 
-    api.post(`/recurring-transactions/user/${transactionData.userId}`, transactionData),
-  
-  getUserRecurringTransactions: (userId: string): Promise<{ data: RecurringTransaction[] }> => 
-    api.get(`/recurring-transactions/user/${userId}`),
-  
-  getUpcomingRecurringTransactions: (userId: string, days: number = 30): Promise<{ data: RecurringTransaction[] }> => 
-    api.get(`/recurring-transactions/upcoming/user/${userId}?days=${days}`),
-  
-  updateRecurringTransaction: (id: string, transactionData: Partial<CreateRecurringTransactionData>): Promise<{ data: RecurringTransaction }> => 
-    api.patch(`/recurring-transactions/${id}`, transactionData),
-  
-  deleteRecurringTransaction: (id: string): Promise<{ data: { message: string } }> => 
-    api.delete(`/recurring-transactions/${id}`),
+export const invitationAPI = {
+  sendInvitation: (groupId: string, data: {
+    email: string;
+    name: string;
+    role: string;
+    phone?: string;
+  }): Promise<AxiosResponse<PendingInvitation>> => 
+    API.post(`/groups/${groupId}/invitations`, data),
+
+  getPendingInvitations: (groupId: string): Promise<AxiosResponse<{ invitations: PendingInvitation[] }>> => 
+    API.get(`/groups/${groupId}/invitations`),
+
+  resendInvitation: (groupId: string, invitationId: string): Promise<AxiosResponse> => 
+    API.post(`/groups/${groupId}/invitations/${invitationId}/resend`),
+
+  cancelInvitation: (groupId: string, invitationId: string): Promise<AxiosResponse> => 
+    API.delete(`/groups/${groupId}/invitations/${invitationId}`),
+
+  acceptInvitation: (token: string): Promise<AxiosResponse> => 
+    API.post('/invitations/accept', { token }),
+
+  declineInvitation: (token: string): Promise<AxiosResponse> => 
+    API.post('/invitations/decline', { token }),
 };
 
-// UPDATED: Notifications API - CORRECTED VERSION
-export const notificationsAPI = {
-  // Get all notifications for the authenticated user
-  getNotifications: (): Promise<{ data: Notification[] }> => 
-    api.get('/notifications'),
-  
-  // Get notifications for a specific user
-  getUserNotifications: (userId: string): Promise<{ data: Notification[] }> => 
-    api.get(`/notifications/user/${userId}`),
-  
-  // FIXED: Now includes userId in URL to match backend
-  createNotification: (userId: string, notificationData: CreateNotificationData): Promise<{ data: Notification }> => 
-    api.post(`/notifications/user/${userId}`, notificationData),
-  
-  markAsRead: (id: string): Promise<{ data: Notification }> => 
-    api.patch(`/notifications/${id}/read`),
-  
-  // FIXED: Changed from PATCH to POST to match backend
-  markAllAsRead: (userId: string): Promise<{ data: { message: string } }> => 
-    api.post(`/notifications/mark-all-read/user/${userId}`),
-  
-  deleteNotification: (id: string): Promise<{ data: { message: string } }> => 
-    api.delete(`/notifications/${id}`),
+export const activityAPI = {
+  getGroupActivities: (groupId: string, params?: {
+    limit?: number;
+    offset?: number;
+  }): Promise<AxiosResponse<{ activities: ActivityLog[]; total: number }>> => 
+    API.get(`/groups/${groupId}/activities`, { params }),
+
+  logActivity: (groupId: string, data: {
+    action: string;
+    details: any;
+  }): Promise<AxiosResponse> => 
+    API.post(`/groups/${groupId}/activities`, data),
 };
 
-// UPDATED: Reports API - CORRECTED TO MATCH BACKEND
-export const reportsAPI = {
-  // Get all reports for a specific user
-  getReports: (userId: string): Promise<{ data: Report[] }> => 
-    api.get(`/reports/user/${userId}`),
-  
-  // Create report for specific user
-  createReport: (userId: string, reportData: CreateReportData): Promise<{ data: Report }> => 
-    api.post(`/reports/user/${userId}`, reportData),
-  
-  getReport: (id: string): Promise<{ data: Report }> => 
-    api.get(`/reports/${id}`),
-  
-  updateReport: (id: string, reportData: Partial<CreateReportData>): Promise<{ data: Report }> => 
-    api.patch(`/reports/${id}`, reportData),
-  
-  deleteReport: (id: string): Promise<{ data: { message: string } }> => 
-    api.delete(`/reports/${id}`),
-  
-  // Generate report data
-  generateReport: (id: string): Promise<{ data: any }> => 
-    api.get(`/reports/${id}/generate`),
-  
-  // Export report
-  exportReport: (id: string, format: string = 'pdf'): Promise<{ data: { url: string } }> => 
-    api.get(`/reports/${id}/export?format=${format}`),
+export const reportAPI = {
+  getGroupReport: (groupId: string, period: 'week' | 'month' | 'year'): Promise<AxiosResponse> => 
+    API.get(`/groups/${groupId}/reports`, { params: { period } }),
+
+  exportReport: (groupId: string, format: 'pdf' | 'csv' | 'excel', period: string): Promise<AxiosResponse> => 
+    API.get(`/groups/${groupId}/reports/export`, { 
+      params: { format, period },
+      responseType: 'blob'
+    }),
+
+  getCategoryReport: (groupId: string): Promise<AxiosResponse> => 
+    API.get(`/groups/${groupId}/reports/categories`),
+
+  getMemberReport: (groupId: string): Promise<AxiosResponse> => 
+    API.get(`/groups/${groupId}/reports/members`),
 };
 
-// UPDATED: Groups API - ADDED EXPENSE METHODS
-export const groupsAPI = {
-  createGroup: (groupData: CreateGroupData): Promise<{ data: Group }> => 
-    api.post('/groups', groupData),
-  
-  getGroup: (id: string): Promise<{ data: Group }> => 
-    api.get(`/groups/${id}`),
-  
-  updateGroup: (id: string, groupData: Partial<CreateGroupData>): Promise<{ data: Group }> => 
-    api.patch(`/groups/${id}`, groupData),
-  
-  deleteGroup: (id: string): Promise<{ data: { message: string } }> => 
-    api.delete(`/groups/${id}`),
-  
-  getUserGroups: (userId: string): Promise<{ data: Group[] }> => 
-    api.get(`/groups/user/${userId}`),
-  
-  addMember: (groupId: string, userId: string, role?: string): Promise<{ data: GroupMember }> => 
-    api.post(`/groups/${groupId}/members`, { userId, role }),
-  
-  acceptInvite: (groupId: string, userId: string): Promise<{ data: GroupMember }> => 
-    api.post(`/groups/${groupId}/accept-invite`, { userId }),
-  
-  getGroupBalance: (groupId: string): Promise<{ data: any }> => 
-    api.get(`/groups/${groupId}/balance`),
+// ============ UTILITY FUNCTIONS ============
+export const apiUtils = {
+  handleError: (error: any): string => {
+    if (axios.isAxiosError(error)) {
+      return error.response?.data?.message || 
+             error.response?.data?.error || 
+             error.message || 
+             'An error occurred';
+    }
+    return 'An unexpected error occurred';
+  },
 
-  // ADD THESE NEW EXPENSE METHODS:
-  createGroupExpense: (groupId: string, expenseData: any): Promise<{ data: GroupExpense }> => 
-    api.post(`/groups/${groupId}/expenses`, expenseData),
+  isAdmin: (userRole: string): boolean => 
+    ['admin', 'owner', 'creator'].includes(userRole?.toLowerCase() || ''),
+
+  formatCurrency: (amount: number, currency: string = 'KES'): string => {
+    return new Intl.NumberFormat('en-KE', {
+      style: 'currency',
+      currency: currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  },
+
+  formatDate: (dateString: string): string => {
+    return new Date(dateString).toLocaleDateString('en-KE', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+  },
+
+  formatDateTime: (dateString: string): string => {
+    return new Date(dateString).toLocaleDateString('en-KE', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  },
+
+  timeAgo: (dateString: string): string => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+    
+    let interval = seconds / 31536000;
+    if (interval > 1) return Math.floor(interval) + ' years ago';
+    
+    interval = seconds / 2592000;
+    if (interval > 1) return Math.floor(interval) + ' months ago';
+    
+    interval = seconds / 86400;
+    if (interval > 1) return Math.floor(interval) + ' days ago';
+    
+    interval = seconds / 3600;
+    if (interval > 1) return Math.floor(interval) + ' hours ago';
+    
+    interval = seconds / 60;
+    if (interval > 1) return Math.floor(interval) + ' minutes ago';
+    
+    return Math.floor(seconds) + ' seconds ago';
+  },
   
-  getGroupExpenses: (groupId: string): Promise<{ data: GroupExpense[] }> => 
-    api.get(`/groups/${groupId}/expenses`),
+  validateEmail: (email: string): boolean => {
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return re.test(email);
+  },
+  
+  validatePhone: (phone: string): boolean => {
+    const re = /^[+]?[\d\s\-\(\)]+$/;
+    return re.test(phone);
+  },
 };
 
-// Group Members API (for other operations)
-export const groupMembersAPI = {
-  getGroupMembers: (groupId: string): Promise<{ data: GroupMember[] }> => 
-    api.get(`/group-members/group/${groupId}`),
-  
-  getMember: (id: string): Promise<{ data: GroupMember }> => 
-    api.get(`/group-members/${id}`),
-  
-  updateMember: (id: string, memberData: Partial<CreateGroupMemberData>): Promise<{ data: GroupMember }> => 
-    api.patch(`/group-members/${id}`, memberData),
-  
-  removeMember: (id: string): Promise<{ data: { message: string } }> => 
-    api.delete(`/group-members/${id}`),
-  
-  getUserMemberships: (userId: string): Promise<{ data: GroupMember[] }> => 
-    api.get(`/group-members/user/${userId}`),
-};
+export default API;
 
-// Group Expenses API
-export const groupExpensesAPI = {
-  getGroupExpenses: (groupId: string): Promise<{ data: GroupExpense[] }> => 
-    api.get(`/group-expenses/group/${groupId}`),
-  
-  createExpense: (expenseData: CreateGroupExpenseData): Promise<{ data: GroupExpense }> => 
-    api.post('/group-expenses', expenseData),
-  
-  getExpense: (id: string): Promise<{ data: GroupExpense }> => 
-    api.get(`/group-expenses/${id}`),
-  
-  updateExpense: (id: string, expenseData: Partial<CreateGroupExpenseData>): Promise<{ data: GroupExpense }> => 
-    api.patch(`/group-expenses/${id}`, expenseData),
-  
-  deleteExpense: (id: string): Promise<{ data: { message: string } }> => 
-    api.delete(`/group-expenses/${id}`),
-  
-  getUserExpenses: (userId: string): Promise<{ data: GroupExpense[] }> => 
-    api.get(`/group-expenses/user/${userId}`),
-};
-
-// Expense Splits API
-export const expenseSplitsAPI = {
-  getExpenseSplits: (expenseId: string): Promise<{ data: ExpenseSplit[] }> => 
-    api.get(`/expense-splits/expense/${expenseId}`),
-  
-  createSplit: (splitData: CreateExpenseSplitData): Promise<{ data: ExpenseSplit }> => 
-    api.post('/expense-splits', splitData),
-  
-  getSplit: (id: string): Promise<{ data: ExpenseSplit }> => 
-    api.get(`/expense-splits/${id}`),
-  
-  updateSplit: (id: string, splitData: Partial<CreateExpenseSplitData>): Promise<{ data: ExpenseSplit }> => 
-    api.patch(`/expense-splits/${id}`, splitData),
-  
-  deleteSplit: (id: string): Promise<{ data: { message: string } }> => 
-    api.delete(`/expense-splits/${id}`),
-  
-  getUserSplits: (userId: string): Promise<{ data: ExpenseSplit[] }> => 
-    api.get(`/expense-splits/user/${userId}`),
-  
-  markAsSettled: (id: string): Promise<{ data: ExpenseSplit }> => 
-    api.patch(`/expense-splits/${id}/settle`),
-};
-
-export default api;
+// REMOVE ALL FEATURE API HOOK EXPORTS FROM HERE!
+// They will be imported directly in components

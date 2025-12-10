@@ -1,38 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { goalsAPI } from '../services/api';
-
-interface Goal {
-  id: string;
-  name: string;
-  targetAmount: number;
-  currentAmount: number;
-  targetDate: string;
-  startDate: string;
-  status: string;
-  category?: string;
-  color?: string;
-  icon?: string;
-  notes?: string;
-  isUnrealistic: boolean;
-  userId: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface GoalTransaction {
-  id: string;
-  amount: number;
-  date: string;
-  notes?: string;
-  type: 'savings' | 'withdrawal';
-  goalId: string;
-  linkedTransactionId?: string;
-  createdAt: string;
-  updatedAt: string;
-}
+import { 
+  useGetGoalsQuery,
+  useGetGoalTransactionsQuery,
+  useAddSavingsMutation,
+  useGetGoalProgressQuery,
+  type Goal,
+  type GoalTransaction
+} from '../features/goals/goalsApi'; // Changed import location
 
 const TestGoalTransactions: React.FC = () => {
-  const [goals, setGoals] = useState<Goal[]>([]);
+  const USER_ID = "437CCFD5-06CA-F011-B991-14F6D814225F";
+  
+  // RTK Query hooks
+  const { data: goals = [], isLoading: goalsLoading, refetch: refetchGoals } = useGetGoalsQuery(USER_ID);
+  const { data: goalProgress, isLoading: progressLoading } = useGetGoalProgressQuery(USER_ID);
+  const [addSavings, { isLoading: addingSavings }] = useAddSavingsMutation();
+  
   const [goalTransactions, setGoalTransactions] = useState<GoalTransaction[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
@@ -41,57 +24,28 @@ const TestGoalTransactions: React.FC = () => {
   const [savingsNotes, setSavingsNotes] = useState<string>('');
   const [successMessage, setSuccessMessage] = useState<string>('');
 
-  // Use a test user ID or get from auth context
-  const USER_ID = "437CCFD5-06CA-F011-B991-14F6D814225F";
+  // RTK Query for goal transactions (conditional query)
+  const { 
+    data: transactions = [], 
+    isLoading: transactionsLoading, 
+    refetch: refetchTransactions 
+  } = useGetGoalTransactionsQuery(selectedGoalId, {
+    skip: !selectedGoalId, // Skip query if no goal selected
+  });
 
-  // Test: Get all goals for user
-  const testGetGoals = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      console.log('Fetching goals for user:', USER_ID);
-      const response = await goalsAPI.getUserGoals(USER_ID);
-      setGoals(response.data);
-      console.log('Goals fetched successfully:', response.data);
-      
-      // Auto-select first goal if available
-      if (response.data.length > 0 && !selectedGoalId) {
-        setSelectedGoalId(response.data[0].id);
-        // Auto-load transactions for the first goal
-        testGetGoalTransactions(response.data[0].id);
-      }
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.message || error.message || 'Unknown error';
-      setError(`Error fetching goals: ${errorMessage}`);
-      console.error('Error fetching goals:', error);
-    } finally {
-      setLoading(false);
+  // Auto-select first goal on load
+  useEffect(() => {
+    if (goals.length > 0 && !selectedGoalId) {
+      setSelectedGoalId(goals[0].id);
     }
-  };
+  }, [goals, selectedGoalId]);
 
-  // Test: Get transactions for a specific goal
-  const testGetGoalTransactions = async (goalId: string) => {
-    if (!goalId) {
-      setError('Please select a goal first');
-      return;
-    }
+  // Update local state when transactions load
+  useEffect(() => {
+    setGoalTransactions(transactions);
+  }, [transactions]);
 
-    setLoading(true);
-    try {
-      console.log('Fetching transactions for goal:', goalId);
-      const response = await goalsAPI.getGoalTransactions(goalId);
-      setGoalTransactions(response.data);
-      console.log(`Transactions for goal ${goalId}:`, response.data);
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.message || error.message || 'Unknown error';
-      setError(`Error fetching goal transactions: ${errorMessage}`);
-      console.error('Error fetching goal transactions:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Test: Add savings to a goal
+  // Test: Add savings to a goal - FIXED to match the actual API signature
   const testAddSavings = async () => {
     if (!selectedGoalId) {
       setError('Please select a goal first');
@@ -109,78 +63,28 @@ const TestGoalTransactions: React.FC = () => {
     
     try {
       const amount = parseFloat(savingsAmount);
-      console.log('Adding savings to goal:', selectedGoalId, 'Amount:', amount);
       
-      const response = await goalsAPI.addSavings(selectedGoalId, { 
-        amount, 
-        notes: savingsNotes || `Savings contribution on ${new Date().toLocaleDateString()}` 
-      });
+      // FIXED: Based on the goalsApi.ts file, addSavings expects { goalId, savings: { amount, notes? } }
+      await addSavings({ 
+        goalId: selectedGoalId, 
+        savings: {
+          amount: amount,
+          notes: savingsNotes || `Savings contribution on ${new Date().toLocaleDateString()}`
+        }
+      }).unwrap();
       
-      console.log('Savings added successfully:', response.data);
       setSuccessMessage(`Successfully added $${amount} to goal!`);
       
       // Refresh data
       setSavingsAmount('');
       setSavingsNotes('');
-      await testGetGoals();
-      await testGetGoalTransactions(selectedGoalId);
+      refetchGoals();
+      refetchTransactions();
       
     } catch (error: any) {
-      const errorMessage = error.response?.data?.message || error.message || 'Unknown error';
+      const errorMessage = error.data?.message || error.message || 'Unknown error';
       setError(`Error adding savings: ${errorMessage}`);
       console.error('Error adding savings:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Test: Get goal progress
-  const testGetGoalProgress = async () => {
-    setLoading(true);
-    try {
-      console.log('Fetching goal progress for user:', USER_ID);
-      const response = await goalsAPI.getGoalProgress(USER_ID);
-      console.log('Goal progress:', response.data);
-      setSuccessMessage(`Goal progress calculated! Check console for details.`);
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.message || error.message || 'Unknown error';
-      setError(`Error fetching goal progress: ${errorMessage}`);
-      console.error('Error fetching goal progress:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Test: Create a test goal first if none exist
-  const testCreateSampleGoal = async () => {
-    setLoading(true);
-    setError('');
-    setSuccessMessage('');
-    
-    try {
-      const sampleGoal = {
-        name: "New Car Fund",
-        targetAmount: 25000,
-        currentAmount: 5000,
-        targetDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
-        startDate: new Date().toISOString(),
-        category: "vehicle",
-        color: "#3B82F6",
-        icon: "🚗",
-        // Remove userId - let backend handle from auth context
-      };
-
-      console.log('Creating sample goal:', sampleGoal);
-      const response = await goalsAPI.createGoal(sampleGoal);
-      console.log('Sample goal created:', response.data);
-      setSuccessMessage('Sample goal created successfully!');
-      
-      // Refresh goals list
-      await testGetGoals();
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.message || error.message || 'Unknown error';
-      setError(`Error creating sample goal: ${errorMessage}`);
-      console.error('Error creating sample goal:', error);
     } finally {
       setLoading(false);
     }
@@ -203,7 +107,7 @@ const TestGoalTransactions: React.FC = () => {
 
   const getTransactionTypeColor = (type: string) => {
     switch (type) {
-      case 'savings': return '#4CAF50';
+      case 'savings': return '#4CAF50'; // Your API uses 'savings', not 'deposit'
       case 'withdrawal': return '#F44336';
       default: return '#607D8B';
     }
@@ -216,78 +120,60 @@ const TestGoalTransactions: React.FC = () => {
     }).format(amount);
   };
 
-  const formatDate = (dateString: string): string => {
+  const formatDate = (dateString: string | undefined): string => {
+    if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString();
   };
 
-  // Load goals on component mount
-  useEffect(() => {
-    testGetGoals();
-  }, []);
-
-  // Auto-load transactions when goal is selected
-  useEffect(() => {
-    if (selectedGoalId) {
-      testGetGoalTransactions(selectedGoalId);
-    }
-  }, [selectedGoalId]);
-
   return (
     <div style={{ padding: '20px', border: '2px solid #3B82F6', margin: '10px', borderRadius: '8px', backgroundColor: '#f8f9fa' }}>
-      <h3 style={{ color: '#3B82F6', marginBottom: '15px' }}>🎯 Goal Transactions API Test</h3>
+      <h3 style={{ color: '#3B82F6', marginBottom: '15px' }}>🎯 Goal Transactions API Test (RTK Query)</h3>
       
       <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#e3f2fd', borderRadius: '8px' }}>
         <p><strong>User ID:</strong> {USER_ID}</p>
-        <p><small>Track savings contributions and withdrawals for your financial goals</small></p>
+        <p style={{ fontSize: '12px', margin: '5px 0' }}>Using RTK Query hooks for goal transactions</p>
+        {goalProgress && !progressLoading && (
+          <p style={{ fontSize: '12px', margin: '5px 0' }}>
+            Overall Goal Progress: {(goalProgress as any).totalProgress || 0}%
+          </p>
+        )}
       </div>
 
       {/* Control Buttons */}
       <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
         <button 
-          onClick={testGetGoals} 
-          disabled={loading}
+          onClick={refetchGoals} 
+          disabled={goalsLoading}
           style={{ 
             padding: '10px 15px', 
             backgroundColor: '#3B82F6', 
             color: 'white', 
             border: 'none', 
             borderRadius: '4px',
-            cursor: loading ? 'not-allowed' : 'pointer'
+            cursor: goalsLoading ? 'not-allowed' : 'pointer'
           }}
         >
           🔄 Refresh Goals
         </button>
-        <button 
-          onClick={testGetGoalProgress} 
-          disabled={loading}
-          style={{ 
-            padding: '10px 15px', 
-            backgroundColor: '#8B5CF6', 
-            color: 'white', 
-            border: 'none', 
-            borderRadius: '4px',
-            cursor: loading ? 'not-allowed' : 'pointer'
-          }}
-        >
-          📊 Get Progress
-        </button>
-        <button 
-          onClick={testCreateSampleGoal} 
-          disabled={loading}
-          style={{ 
-            padding: '10px 15px', 
-            backgroundColor: '#F59E0B', 
-            color: 'white', 
-            border: 'none', 
-            borderRadius: '4px',
-            cursor: loading ? 'not-allowed' : 'pointer'
-          }}
-        >
-          🚗 Create Sample Goal
-        </button>
+        {selectedGoalId && (
+          <button 
+            onClick={() => refetchTransactions()} 
+            disabled={transactionsLoading}
+            style={{ 
+              padding: '10px 15px', 
+              backgroundColor: '#10B981', 
+              color: 'white', 
+              border: 'none', 
+              borderRadius: '4px',
+              cursor: transactionsLoading ? 'not-allowed' : 'pointer'
+            }}
+          >
+            📋 Refresh Transactions
+          </button>
+        )}
       </div>
 
-      {loading && (
+      {(goalsLoading || transactionsLoading || addingSavings || loading) && (
         <div style={{ padding: '10px', textAlign: 'center', color: '#3B82F6' }}>
           Loading...
         </div>
@@ -308,9 +194,9 @@ const TestGoalTransactions: React.FC = () => {
       {/* Goals Selection */}
       <div style={{ marginBottom: '20px' }}>
         <h4>Select Goal ({goals.length} available)</h4>
-        {goals.length === 0 && !loading && (
+        {goals.length === 0 && !goalsLoading && (
           <div style={{ color: '#666', padding: '15px', backgroundColor: '#fff3cd', borderRadius: '4px' }}>
-            <p>No goals found. Create a sample goal to get started.</p>
+            <p>No goals found. Create a goal to get started.</p>
           </div>
         )}
         
@@ -328,31 +214,17 @@ const TestGoalTransactions: React.FC = () => {
               }}
             >
               <option value="">Select a goal...</option>
-              {goals.map(goal => (
+              {goals.map((goal: Goal) => (
                 <option key={goal.id} value={goal.id}>
                   {goal.name} - {getGoalProgress(goal).toFixed(1)}% complete
                 </option>
               ))}
             </select>
-            <button 
-              onClick={() => testGetGoalTransactions(selectedGoalId)}
-              disabled={!selectedGoalId || loading}
-              style={{ 
-                padding: '8px 15px',
-                backgroundColor: '#10B981',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: !selectedGoalId || loading ? 'not-allowed' : 'pointer'
-              }}
-            >
-              📋 Get Transactions
-            </button>
           </div>
         )}
 
         {/* Selected Goal Info */}
-        {selectedGoalId && goals.find(g => g.id === selectedGoalId) && (
+        {selectedGoalId && goals.find((g: Goal) => g.id === selectedGoalId) && (
           <div style={{ 
             border: '1px solid #ddd', 
             padding: '15px', 
@@ -361,12 +233,12 @@ const TestGoalTransactions: React.FC = () => {
             boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
           }}>
             {(() => {
-              const goal = goals.find(g => g.id === selectedGoalId)!;
+              const goal = goals.find((g: Goal) => g.id === selectedGoalId)!;
               const progress = getGoalProgress(goal);
               return (
                 <div>
                   <h4 style={{ margin: '0 0 10px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span>{goal.icon}</span>
+                    {goal.icon && <span>{goal.icon}</span>}
                     <span>{goal.name}</span>
                     <span style={{ 
                       fontSize: '12px', 
@@ -438,17 +310,17 @@ const TestGoalTransactions: React.FC = () => {
           />
           <button 
             onClick={testAddSavings}
-            disabled={!selectedGoalId || !savingsAmount || loading}
+            disabled={!selectedGoalId || !savingsAmount || addingSavings}
             style={{ 
               padding: '8px 15px',
-              backgroundColor: !selectedGoalId || !savingsAmount || loading ? '#ccc' : '#4CAF50', 
+              backgroundColor: !selectedGoalId || !savingsAmount || addingSavings ? '#ccc' : '#4CAF50', 
               color: 'white',
               border: 'none',
               borderRadius: '4px',
-              cursor: !selectedGoalId || !savingsAmount || loading ? 'not-allowed' : 'pointer'
+              cursor: !selectedGoalId || !savingsAmount || addingSavings ? 'not-allowed' : 'pointer'
             }}
           >
-            {loading ? 'Adding...' : '💰 Add Savings'}
+            {addingSavings ? 'Adding...' : '💰 Add Savings'}
           </button>
         </div>
       </div>
@@ -456,12 +328,12 @@ const TestGoalTransactions: React.FC = () => {
       {/* Goal Transactions List */}
       <div>
         <h4>Goal Transactions ({goalTransactions.length})</h4>
-        {goalTransactions.length === 0 && selectedGoalId && !loading && (
+        {goalTransactions.length === 0 && selectedGoalId && !transactionsLoading && (
           <div style={{ color: '#666', padding: '15px', textAlign: 'center', backgroundColor: '#f8f9fa', borderRadius: '4px' }}>
             No transactions found for this goal. Add some savings to see them here.
           </div>
         )}
-        {goalTransactions.map(transaction => (
+        {goalTransactions.map((transaction: GoalTransaction) => (
           <div key={transaction.id} style={{ 
             border: '1px solid #eee', 
             margin: '10px 0', 
@@ -473,7 +345,7 @@ const TestGoalTransactions: React.FC = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
               <div>
                 <h4 style={{ margin: 0, marginBottom: '5px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {transaction.type === 'savings' ? '💰 Savings' : '💸 Withdrawal'}
+                  {transaction.type === 'savings' ? '💰 Deposit' : '💸 Withdrawal'}
                   <span style={{ 
                     padding: '2px 8px',
                     backgroundColor: getTransactionTypeColor(transaction.type),
@@ -502,9 +374,6 @@ const TestGoalTransactions: React.FC = () => {
             <div style={{ fontSize: '12px', color: '#888', borderTop: '1px solid #f0f0f0', paddingTop: '8px' }}>
               Transaction ID: {transaction.id} | 
               Created: {formatDate(transaction.createdAt)}
-              {transaction.linkedTransactionId && (
-                <span> | Linked to transaction: {transaction.linkedTransactionId}</span>
-              )}
             </div>
           </div>
         ))}

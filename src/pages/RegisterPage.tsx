@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
+import { registerUser } from '../features/auth/authSlice';
 import { colors } from '../styles/colors';
 import { spacing } from '../styles/spacing';
 import { typography } from '../styles/typography';
@@ -16,7 +18,9 @@ const RegisterPage: React.FC = () => {
     userType: 'personal'
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
   const borderColor = colors.gray[200];
   const primaryColor = colors.primary[500];
@@ -26,33 +30,133 @@ const RegisterPage: React.FC = () => {
       ...formData,
       [e.target.name]: e.target.value
     });
+    setError('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.clear();
+    console.log('🧪 === REGISTRATION START ===');
+    
+    // Validation
+    if (!formData.firstName || !formData.lastName || !formData.email || !formData.password || !formData.confirmPassword) {
+      setError('Please fill in all fields');
+      return;
+    }
+    
     if (formData.password !== formData.confirmPassword) {
-      alert('Passwords do not match!');
+      setError('Passwords do not match!');
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      return;
+    }
+
+    if (!formData.email.includes('@')) {
+      setError('Please enter a valid email address');
       return;
     }
 
     setIsLoading(true);
+    setError('');
 
-    setTimeout(() => {
-      const newUser = {
-        role: formData.userType,
-        name: `${formData.firstName} ${formData.lastName}`,
-        email: formData.email
+    try {
+      const userData = {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        password: formData.password,
+        userType: formData.userType
       };
-      
-      localStorage.setItem('userRole', newUser.role);
-      localStorage.setItem('userName', newUser.name);
-      localStorage.setItem('userEmail', newUser.email);
-      localStorage.setItem('authToken', 'mock-jwt-token-12345');
 
+      console.log('📤 Sending registration data:', userData);
+      
+      // Test backend connection first
+      try {
+        console.log('🌐 Testing backend connection...');
+        const testResponse = await fetch('http://localhost:8000', {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        console.log('✅ Backend reachable, status:', testResponse.status);
+      } catch (testError: any) {
+        console.error('❌ Backend not reachable:', testError);
+        setError('Cannot connect to backend server. Please make sure it\'s running on http://localhost:8000');
+        setIsLoading(false);
+        return;
+      }
+
+      // Try to register using Redux
+      console.log('🔄 Dispatching registerUser action...');
+      const result = await dispatch(registerUser(userData) as any);
+      
+      console.log('📥 Dispatch result:', result);
+      
+      if (result.error) {
+        console.error('❌ Registration failed:', result.error);
+        setError(result.error.message || 'Registration failed. Please try again.');
+      } else {
+        console.log('✅ Registration successful!');
+        
+        // Show success message
+        alert(`✅ Registration successful!\n\nEmail: ${formData.email}\n\nPlease login with your credentials.`);
+        
+        // Clear form
+        setFormData({
+          firstName: '',
+          lastName: '',
+          email: '',
+          password: '',
+          confirmPassword: '',
+          userType: 'personal'
+        });
+        
+        // Redirect to login page
+        navigate('/login');
+      }
+      
+    } catch (err: any) {
+      console.error('❌ Unexpected error:', err);
+      setError('An unexpected error occurred. Please try again.');
+    } finally {
       setIsLoading(false);
-      navigate('/dashboard');
-    }, 1500);
+      console.log('🏁 Registration process complete');
+    }
+  };
+
+  const testBackendConnection = async () => {
+    console.clear();
+    console.log('🔍 Testing backend connection...');
+    
+    try {
+      // Test multiple endpoints
+      const endpoints = [
+        'http://localhost:8000/auth/register',
+        'http://localhost:8000/auth/login'
+      ];
+      
+      const results = [];
+      
+      for (const endpoint of endpoints) {
+        try {
+          const response = await fetch(endpoint, { method: 'GET' });
+          results.push(`${endpoint}: ${response.status} ${response.statusText}`);
+          console.log(`${endpoint}: ${response.status}`);
+        } catch (error: any) {
+          results.push(`${endpoint}: ERROR - ${error.message}`);
+          console.error(`${endpoint}:`, error.message);
+        }
+      }
+      
+      alert(`Backend Test Results:\n\n${results.join('\n')}`);
+      
+    } catch (error: any) {
+      alert(`❌ Test failed: ${error.message}`);
+      console.error('Test failed:', error);
+    }
   };
 
   const userTypes = [
@@ -100,11 +204,26 @@ const RegisterPage: React.FC = () => {
           </div>
 
           <div style={{ backgroundColor: 'white', padding: spacing[8], borderRadius: '16px', boxShadow: '0 10px 25px rgba(0, 0, 0, 0.05)', border: `1px solid ${borderColor}` }}>
+            {error && (
+              <div style={{ 
+                backgroundColor: colors.primary[50], 
+                border: `1px solid ${colors.primary[200]}`,
+                color: colors.primary[700],
+                padding: spacing[3],
+                borderRadius: '8px',
+                marginBottom: spacing[4],
+                fontSize: typography.fontSize.sm
+              }}>
+                <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>Error</div>
+                <div>{error}</div>
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: spacing[5] }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: spacing[4] }}>
                 <div>
                   <label style={{ display: 'block', fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.medium, color: colors.text.primary, marginBottom: spacing[2] }}>
-                    First Name
+                    First Name *
                   </label>
                   <input
                     type="text"
@@ -119,7 +238,7 @@ const RegisterPage: React.FC = () => {
 
                 <div>
                   <label style={{ display: 'block', fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.medium, color: colors.text.primary, marginBottom: spacing[2] }}>
-                    Last Name
+                    Last Name *
                   </label>
                   <input
                     type="text"
@@ -135,7 +254,7 @@ const RegisterPage: React.FC = () => {
 
               <div>
                 <label style={{ display: 'block', fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.medium, color: colors.text.primary, marginBottom: spacing[2] }}>
-                  Email Address
+                  Email Address *
                 </label>
                 <input
                   type="email"
@@ -185,7 +304,7 @@ const RegisterPage: React.FC = () => {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: spacing[4] }}>
                 <div>
                   <label style={{ display: 'block', fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.medium, color: colors.text.primary, marginBottom: spacing[2] }}>
-                    Password
+                    Password *
                   </label>
                   <input
                     type="password"
@@ -193,14 +312,14 @@ const RegisterPage: React.FC = () => {
                     value={formData.password}
                     onChange={handleChange}
                     required
-                    placeholder="Create password"
+                    placeholder="Create password (min 6 characters)"
                     style={{ width: '100%', padding: spacing[3], border: `1px solid ${borderColor}`, borderRadius: '8px', fontSize: typography.fontSize.base, backgroundColor: colors.background.primary }}
                   />
                 </div>
 
                 <div>
                   <label style={{ display: 'block', fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.medium, color: colors.text.primary, marginBottom: spacing[2] }}>
-                    Confirm Password
+                    Confirm Password *
                   </label>
                   <input
                     type="password"
@@ -217,11 +336,41 @@ const RegisterPage: React.FC = () => {
               <button
                 type="submit"
                 disabled={isLoading}
-                style={{ backgroundColor: isLoading ? colors.primary[300] : primaryColor, color: 'white', padding: spacing[3], border: 'none', borderRadius: '8px', fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.semibold, cursor: isLoading ? 'not-allowed' : 'pointer', marginTop: spacing[2] }}
+                style={{ 
+                  backgroundColor: isLoading ? colors.primary[300] : primaryColor, 
+                  color: 'white', 
+                  padding: spacing[3], 
+                  border: 'none', 
+                  borderRadius: '8px', 
+                  fontSize: typography.fontSize.lg, 
+                  fontWeight: typography.fontWeight.semibold, 
+                  cursor: isLoading ? 'not-allowed' : 'pointer', 
+                  marginTop: spacing[2],
+                  opacity: isLoading ? 0.7 : 1
+                }}
               >
                 {isLoading ? 'Creating Account...' : 'Create Account'}
               </button>
             </form>
+
+            {/* Test Backend Button */}
+            <div style={{ marginTop: spacing[4], textAlign: 'center' }}>
+              <button
+                type="button"
+                onClick={testBackendConnection}
+                style={{
+                  backgroundColor: colors.gray[100],
+                  color: colors.gray[700],
+                  padding: `${spacing[2]} ${spacing[3]}`,
+                  border: `1px solid ${colors.gray[300]}`,
+                  borderRadius: '8px',
+                  fontSize: typography.fontSize.sm,
+                  cursor: 'pointer'
+                }}
+              >
+                🔍 Test Backend Connection
+              </button>
+            </div>
 
             <div style={{ textAlign: 'center', marginTop: spacing[6], paddingTop: spacing[6], borderTop: `1px solid ${borderColor}` }}>
               <p style={{ fontSize: typography.fontSize.sm, color: colors.text.secondary }}>

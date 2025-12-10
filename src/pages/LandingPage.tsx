@@ -4,8 +4,8 @@ import { colors } from '../styles/colors';
 import { spacing } from '../styles/spacing';
 import { typography } from '../styles/typography';
 
-// Updated import path - removed "images/" folder and fixed extension
-import heroImage from '../../assets/landing-hero.png';
+// CORRECT PATH - Image is in src/assets/ NOT src/assets/images/
+import heroImage from '../assets/landing-hero.png';
 import { Header } from '../components/Layout';
 
 const LandingPage: React.FC = () => {
@@ -67,7 +67,7 @@ const LandingPage: React.FC = () => {
 
   return (
     <div style={{ 
-      minHeight: 'h-screen',
+      minHeight: '100vh',
       background: 'linear-gradient(135deg, #fff5f7 0%, #ffffff 100%)'
     }}>
       <Header />

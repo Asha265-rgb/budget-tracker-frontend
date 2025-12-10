@@ -1,30 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { groupsAPI, groupMembersAPI } from '../../services/api';
-
-interface Group {
-  id: string;
-  name: string;
-  description?: string;
-  status: string;
-  currency: string;
-  createdBy: string;
-}
-
-interface GroupMember {
-  id: string;
-  role: string;
-  status: string;
-  totalOwed: number;
-  totalOwes: number;
-  userId: string;
-  groupId: string;
-  user?: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-  };
-}
+import { 
+  useGetGroupsQuery,
+  useGetGroupMembersQuery,
+  useCreateGroupMutation,
+  type Group,
+  type GroupMember,
+} from '../../features/groups/groupsApi'; // FIXED: Changed import source
 
 const TestGroupMembers: React.FC = () => {
   const [groups, setGroups] = useState<Group[]>([]);
@@ -34,16 +15,20 @@ const TestGroupMembers: React.FC = () => {
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
 
-  const USER_ID = "437CCFD5-06CA-F011-B991-14F6D814225F";
+  // RTK Query hooks
+  const { data: groupsData = [], refetch: refetchGroups } = useGetGroupsQuery();
+  const { data: membersData = [] } = useGetGroupMembersQuery(selectedGroupId, {
+    skip: !selectedGroupId
+  });
+  const [createGroup] = useCreateGroupMutation();
 
   // Fetch user's groups
   const fetchUserGroups = async () => {
     setLoading(true);
     setError('');
     try {
-      const response = await groupsAPI.getUserGroups(USER_ID);
-      setGroups(response.data);
-      console.log('User groups:', response.data);
+      setGroups(groupsData);
+      console.log('User groups:', groupsData);
     } catch (err: any) {
       setError(`Failed to fetch groups: ${err.response?.data?.message || err.message}`);
     } finally {
@@ -57,9 +42,8 @@ const TestGroupMembers: React.FC = () => {
     
     setLoading(true);
     try {
-      const response = await groupMembersAPI.getGroupMembers(groupId);
-      setGroupMembers(response.data);
-      console.log('Group members:', response.data);
+      setGroupMembers(membersData || []);
+      console.log('Group members:', membersData);
     } catch (err: any) {
       setError(`Failed to fetch group members: ${err.response?.data?.message || err.message}`);
     } finally {
@@ -67,46 +51,30 @@ const TestGroupMembers: React.FC = () => {
     }
   };
 
-  // Add member to group
+  // Add member to group - useAddGroupMemberMutation doesn't exist, so we'll skip this for now
   const testAddMember = async () => {
-    if (!selectedGroupId) {
-      setError('Please select a group first');
-      return;
-    }
-
-    // For testing, we'll use the same user ID (you'd normally add other users)
-    // const newMemberUserId = "ANOTHER_USER_ID"; // This should be a different user ID
-    
-    setLoading(true);
-    try {
-      const response = await groupsAPI.addMember(selectedGroupId, USER_ID, 'member');
-      setSuccess(`Member added successfully!`);
-      console.log('Member added:', response.data);
-      await fetchGroupMembers(selectedGroupId);
-    } catch (err: any) {
-      setError(`Failed to add member: ${err.response?.data?.message || err.message}`);
-    } finally {
-      setLoading(false);
-    }
+    setError('Add member functionality not yet implemented in API');
+    console.warn('useAddGroupMemberMutation is not implemented yet');
   };
 
   // Create test group
   const testCreateGroup = async () => {
     setLoading(true);
+    setError('');
+    setSuccess('');
     try {
       const groupData = {
         name: `Test Group ${Date.now()}`,
         description: 'Automated test group',
         currency: 'USD',
-        userId: USER_ID
       };
       
-      const response = await groupsAPI.createGroup(groupData);
-      setSuccess(`Group "${response.data.name}" created successfully!`);
-      console.log('Group created:', response.data);
-      await fetchUserGroups();
+      const response = await createGroup(groupData).unwrap();
+      setSuccess(`Group "${response.name}" created successfully!`);
+      console.log('Group created:', response);
+      await refetchGroups();
     } catch (err: any) {
-      setError(`Failed to create group: ${err.response?.data?.message || err.message}`);
+      setError(`Failed to create group: ${err.data?.message || err.message}`);
     } finally {
       setLoading(false);
     }
@@ -114,13 +82,15 @@ const TestGroupMembers: React.FC = () => {
 
   useEffect(() => {
     fetchUserGroups();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupsData]);
 
   useEffect(() => {
     if (selectedGroupId) {
       fetchGroupMembers(selectedGroupId);
     }
-  }, [selectedGroupId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedGroupId, membersData]);
 
   return (
     <div style={{ padding: '20px', border: '2px solid #8B5CF6', margin: '10px', borderRadius: '8px' }}>
@@ -128,17 +98,41 @@ const TestGroupMembers: React.FC = () => {
 
       {/* Control Buttons */}
       <div style={{ marginBottom: '20px' }}>
-        <button onClick={fetchUserGroups} disabled={loading} style={{ marginRight: '10px' }}>
+        <button 
+          onClick={fetchUserGroups} 
+          disabled={loading}
+          style={{ 
+            marginRight: '10px',
+            padding: '10px 15px',
+            backgroundColor: '#8B5CF6',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: loading ? 'not-allowed' : 'pointer'
+          }}
+        >
           🔄 Refresh Groups
         </button>
-        <button onClick={testCreateGroup} disabled={loading} style={{ marginRight: '10px', backgroundColor: '#F59E0B' }}>
+        <button 
+          onClick={testCreateGroup} 
+          disabled={loading}
+          style={{ 
+            marginRight: '10px',
+            padding: '10px 15px',
+            backgroundColor: '#F59E0B',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: loading ? 'not-allowed' : 'pointer'
+          }}
+        >
           🏠 Create Test Group
         </button>
       </div>
 
       {loading && <p>Loading...</p>}
-      {error && <div style={{ color: 'red', marginBottom: '15px' }}>Error: {error}</div>}
-      {success && <div style={{ color: 'green', marginBottom: '15px' }}>Success: {success}</div>}
+      {error && <div style={{ color: 'red', marginBottom: '15px', padding: '10px', backgroundColor: '#ffe6e6', borderRadius: '4px' }}>Error: {error}</div>}
+      {success && <div style={{ color: 'green', marginBottom: '15px', padding: '10px', backgroundColor: '#e6ffe6', borderRadius: '4px' }}>Success: {success}</div>}
 
       {/* Group Selection */}
       <div style={{ marginBottom: '20px' }}>
@@ -146,19 +140,36 @@ const TestGroupMembers: React.FC = () => {
         <select 
           value={selectedGroupId} 
           onChange={(e) => setSelectedGroupId(e.target.value)}
-          style={{ padding: '8px', width: '300px', marginRight: '10px' }}
+          style={{ 
+            padding: '8px', 
+            width: '300px', 
+            marginRight: '10px',
+            border: '1px solid #ddd',
+            borderRadius: '4px'
+          }}
         >
           <option value="">Select a group...</option>
           {groups.map(group => (
             <option key={group.id} value={group.id}>
-              {group.name} - {group.status}
+              {group.name}
             </option>
           ))}
         </select>
         
         {selectedGroupId && (
-          <button onClick={testAddMember} disabled={loading}>
-            ➕ Add Current User as Member
+          <button 
+            onClick={testAddMember} 
+            disabled={loading}
+            style={{
+              padding: '8px 15px',
+              backgroundColor: '#ccc',
+              color: '#666',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'not-allowed'
+            }}
+          >
+            ➕ Add Member (Not Implemented)
           </button>
         )}
       </div>
@@ -168,14 +179,18 @@ const TestGroupMembers: React.FC = () => {
         <div>
           <h4>Group Members ({groupMembers.length})</h4>
           {groupMembers.length === 0 ? (
-            <p>No members found. Add members to this group.</p>
+            <p style={{ color: '#666', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '4px' }}>
+              No members found. Add members to this group.
+            </p>
           ) : (
-            groupMembers.map(member => (
+            groupMembers.map((member: any) => (
               <div key={member.id} style={{ 
                 border: '1px solid #ddd', 
                 padding: '15px', 
                 margin: '10px 0',
-                borderRadius: '8px'
+                borderRadius: '8px',
+                backgroundColor: '#ffffff',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <div>
@@ -184,7 +199,7 @@ const TestGroupMembers: React.FC = () => {
                       <span style={{ 
                         marginLeft: '10px',
                         padding: '2px 8px',
-                        backgroundColor: member.role === 'owner' ? '#EF4444' : '#3B82F6',
+                        backgroundColor: member.role === 'owner' || member.role === 'admin' ? '#EF4444' : '#3B82F6',
                         color: 'white',
                         borderRadius: '12px',
                         fontSize: '12px'
@@ -192,24 +207,28 @@ const TestGroupMembers: React.FC = () => {
                         {member.role}
                       </span>
                     </h5>
+                    {member.user && (
+                      <p style={{ margin: '5px 0', fontSize: '14px', color: '#555' }}>
+                        {member.user.firstName} {member.user.lastName} ({member.user.email})
+                      </p>
+                    )}
                     <p style={{ margin: '5px 0' }}>
-                      Status: <strong>{member.status}</strong> | 
-                      Owed: <strong>${member.totalOwed}</strong> | 
-                      Owes: <strong>${member.totalOwes}</strong>
+                      Owed: <strong>${member.totalOwed || 0}</strong> | 
+                      Owes: <strong>${member.totalOwes || 0}</strong>
                     </p>
                     <p style={{ margin: 0, fontSize: '12px', color: '#666' }}>
-                      Net Balance: <strong>${member.totalOwes - member.totalOwed}</strong>
+                      Net Balance: <strong>${(member.totalOwes || 0) - (member.totalOwed || 0)}</strong>
                     </p>
                   </div>
                   <div>
                     <span style={{ 
                       padding: '4px 8px',
-                      backgroundColor: member.status === 'active' ? '#10B981' : '#6B7280',
+                      backgroundColor: (member.status || 'active') === 'active' ? '#10B981' : '#6B7280',
                       color: 'white',
                       borderRadius: '4px',
                       fontSize: '12px'
                     }}>
-                      {member.status}
+                      {member.status || 'active'}
                     </span>
                   </div>
                 </div>
@@ -223,3 +242,5 @@ const TestGroupMembers: React.FC = () => {
 };
 
 export default TestGroupMembers;
+
+

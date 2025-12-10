@@ -3,69 +3,170 @@ import { colors } from '../../styles/colors';
 import { spacing } from '../../styles/spacing';
 import { typography } from '../../styles/typography';
 import Card from '../Common/Card';
+import { 
+  useGetRecentTransactionsQuery,
+  type Transaction as ApiTransaction 
+} from '../../features/transactions/transactionsApi';
 
-interface TransactionBase {
+interface RecentTransactionsProps {
+  userType?: 'personal' | 'business' | 'group';
+  userId?: string;
+}
+
+interface DisplayTransaction {
   id: number;
   description: string;
   amount: number;
   type: string;
   date: string;
   category: string;
+  paidBy?: string;
 }
 
-interface PersonalTransaction extends TransactionBase {
-  // No additional properties for personal
-}
+const RecentTransactions: React.FC<RecentTransactionsProps> = ({ 
+  userType = 'personal',
+  userId 
+}) => {
+  const { 
+    data: apiTransactions = [], 
+    isLoading, 
+    isError, 
+    error,
+    refetch 
+  } = useGetRecentTransactionsQuery(userId || '', {
+    skip: !userId,
+  });
 
-interface BusinessTransaction extends TransactionBase {
-  // No additional properties for business
-}
+  const transformApiData = (apiData: ApiTransaction[]): DisplayTransaction[] => {
+    return apiData.map((item: ApiTransaction, index: number) => ({
+      id: index + 1,
+      description: item.description,
+      amount: item.amount,
+      type: item.type,
+      date: item.date,
+      category: item.category,
+      ...(userType === 'group' && { paidBy: 'You' })
+    }));
+  };
 
-interface GroupTransaction extends TransactionBase {
-  paidBy: string;
-}
+  const transactions = transformApiData(apiTransactions);
+  const loading = isLoading;
+  const errorMessage = isError ? (error as any)?.data?.message || 'Failed to load transactions' : null;
 
-type Transaction = PersonalTransaction | BusinessTransaction | GroupTransaction;
-
-interface RecentTransactionsProps {
-  userType?: 'personal' | 'business' | 'group';
-}
-
-const RecentTransactions: React.FC<RecentTransactionsProps> = ({ userType = 'personal' }) => {
-  // Different transactions based on user type with proper typing
-  const getTransactions = (): Transaction[] => {
-    switch (userType) {
-      case 'business':
-        return [
-          { id: 1, description: 'Client Payment - ABC Corp', amount: 5000, type: 'income', date: '2025-11-27', category: 'Revenue' },
-          { id: 2, description: 'Office Rent', amount: 1200, type: 'expense', date: '2025-11-26', category: 'Operations' },
-          { id: 3, description: 'Employee Salaries', amount: 3500, type: 'expense', date: '2025-11-25', category: 'Payroll' },
-          { id: 4, description: 'Marketing Campaign', amount: 800, type: 'expense', date: '2025-11-24', category: 'Marketing' },
-        ];
-      case 'group':
-        return [
-          { id: 1, description: 'Dinner - Italian Restaurant', amount: 150, type: 'expense', date: '2025-11-27', category: 'Food', paidBy: 'You' },
-          { id: 2, description: 'Movie Tickets', amount: 60, type: 'expense', date: '2025-11-26', category: 'Entertainment', paidBy: 'Alice' },
-          { id: 3, description: 'Groceries', amount: 85, type: 'expense', date: '2025-11-25', category: 'Food', paidBy: 'Bob' },
-          { id: 4, description: 'Uber Ride', amount: 45, type: 'expense', date: '2025-11-24', category: 'Transport', paidBy: 'You' },
-        ];
-      case 'personal':
-      default:
-        return [
-          { id: 1, description: 'Salary Deposit', amount: 3200, type: 'income', date: '2025-11-27', category: 'Salary' },
-          { id: 2, description: 'Grocery Shopping', amount: 85.50, type: 'expense', date: '2025-11-26', category: 'Food' },
-          { id: 3, description: 'Netflix Subscription', amount: 15.99, type: 'expense', date: '2025-11-25', category: 'Entertainment' },
-          { id: 4, description: 'Gas Station', amount: 45.00, type: 'expense', date: '2025-11-24', category: 'Transport' },
-        ];
+  const fetchTransactions = () => {
+    if (userId) {
+      refetch();
     }
   };
 
-  const transactions = getTransactions();
-
-  // Helper function to check if transaction has paidBy property
-  const hasPaidBy = (transaction: Transaction): transaction is GroupTransaction => {
+  const hasPaidBy = (transaction: DisplayTransaction): boolean => {
     return 'paidBy' in transaction;
   };
+
+  if (!userId) {
+    return (
+      <div>
+        <h2
+          style={{
+            fontSize: typography.fontSize.xl,
+            fontWeight: typography.fontWeight.semibold,
+            color: colors.text.primary,
+            margin: `0 0 ${spacing[4]} 0`,
+          }}
+        >
+          {userType === 'business' ? 'Recent Business Transactions' : 
+           userType === 'group' ? 'Recent Group Expenses' : 'Recent Transactions'}
+        </h2>
+        <Card style={{ padding: spacing[4] }}>
+          <div style={{ textAlign: 'center', padding: spacing[8] }}>
+            <div style={{ color: colors.text.secondary }}>Loading user information...</div>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div>
+        <h2
+          style={{
+            fontSize: typography.fontSize.xl,
+            fontWeight: typography.fontWeight.semibold,
+            color: colors.text.primary,
+            margin: `0 0 ${spacing[4]} 0`,
+          }}
+        >
+          {userType === 'business' ? 'Recent Business Transactions' : 
+           userType === 'group' ? 'Recent Group Expenses' : 'Recent Transactions'}
+        </h2>
+        <Card style={{ padding: spacing[4] }}>
+          <div style={{ textAlign: 'center', padding: spacing[8] }}>
+            <div style={{ color: colors.text.secondary }}>Loading transactions...</div>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (errorMessage) {
+    return (
+      <div>
+        <h2
+          style={{
+            fontSize: typography.fontSize.xl,
+            fontWeight: typography.fontWeight.semibold,
+            color: colors.text.primary,
+            margin: `0 0 ${spacing[4]} 0`,
+          }}
+        >
+          {userType === 'business' ? 'Recent Business Transactions' : 
+           userType === 'group' ? 'Recent Group Expenses' : 'Recent Transactions'}
+        </h2>
+        <Card style={{ padding: spacing[4] }}>
+          <div style={{ textAlign: 'center', padding: spacing[8] }}>
+            <div style={{ color: colors.status.error, marginBottom: spacing[2] }}>{errorMessage}</div>
+            <button
+              onClick={fetchTransactions}
+              style={{
+                padding: `${spacing[2]} ${spacing[4]}`,
+                backgroundColor: colors.primary[500],
+                color: colors.text.white,
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+              }}
+            >
+              Retry
+            </button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (transactions.length === 0) {
+    return (
+      <div>
+        <h2
+          style={{
+            fontSize: typography.fontSize.xl,
+            fontWeight: typography.fontWeight.semibold,
+            color: colors.text.primary,
+            margin: `0 0 ${spacing[4]} 0`,
+          }}
+        >
+          {userType === 'business' ? 'Recent Business Transactions' : 
+           userType === 'group' ? 'Recent Group Expenses' : 'Recent Transactions'}
+        </h2>
+        <Card style={{ padding: spacing[4] }}>
+          <div style={{ textAlign: 'center', padding: spacing[8] }}>
+            <div style={{ color: colors.text.secondary }}>No transactions found</div>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -127,7 +228,7 @@ const RecentTransactions: React.FC<RecentTransactionsProps> = ({ userType = 'per
                     }}
                   >
                     {transaction.date} • {transaction.category}
-                    {userType === 'group' && hasPaidBy(transaction) && ` • Paid by ${transaction.paidBy}`}
+                    {userType === 'group' && hasPaidBy(transaction) && transaction.paidBy && ` • Paid by ${transaction.paidBy}`}
                   </div>
                 </div>
               </div>
@@ -138,7 +239,7 @@ const RecentTransactions: React.FC<RecentTransactionsProps> = ({ userType = 'per
                   color: transaction.type === 'income' ? colors.status.success : colors.status.error,
                 }}
               >
-                {transaction.type === 'income' ? '+' : '-'}${transaction.amount}
+                {transaction.type === 'income' ? '+' : '-'}${transaction.amount.toFixed(2)}
               </div>
             </div>
           ))}

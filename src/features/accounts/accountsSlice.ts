@@ -1,13 +1,23 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { accountsAPI } from '../../services/api';
+import axios from 'axios';
+import type { Account } from './accountsApi';
 
-interface Account {
-  id: string;
-  name: string;
-  type: string;
-  balance: number;
-  currency: string;
-}
+// Create axios instance
+const axiosInstance = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000/api',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Add token interceptor
+axiosInstance.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
 
 interface AccountsState {
   accounts: Account[];
@@ -25,10 +35,10 @@ export const fetchAccounts = createAsyncThunk(
   'accounts/fetchAccounts',
   async (userId: string, { rejectWithValue }) => {
     try {
-      const response = await accountsAPI.getAccounts(userId);
+      const response = await axiosInstance.get(`/accounts/user/${userId}`);
       return response.data;
     } catch (error: any) {
-      return rejectWithValue(error.response.data.message);
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch accounts');
     }
   }
 );
@@ -37,10 +47,34 @@ export const createAccount = createAsyncThunk(
   'accounts/createAccount',
   async (accountData: any, { rejectWithValue }) => {
     try {
-      const response = await accountsAPI.createAccount(accountData);
+      console.log('📤 Frontend sending to API:', accountData);
+      
+      // CRITICAL: Make sure userId is included
+      if (!accountData.userId) {
+        console.error('❌ Missing userId in account data');
+        return rejectWithValue('User ID is required to create an account');
+      }
+      
+      // The API will transform the data, just send it as-is
+      const response = await axiosInstance.post('/accounts', accountData);
+      console.log('✅ Backend response:', response.data);
       return response.data;
+      
     } catch (error: any) {
-      return rejectWithValue(error.response.data.message);
+      console.error('❌ Create account error:', error);
+      
+      // Log detailed error info
+      if (error.response) {
+        console.error('Error response:', error.response.data);
+        console.error('Error status:', error.response.status);
+        return rejectWithValue(error.response.data?.message || `Server error: ${error.response.status}`);
+      } else if (error.request) {
+        console.error('No response received:', error.request);
+        return rejectWithValue('No response from server. Check if backend is running.');
+      } else {
+        console.error('Request setup error:', error.message);
+        return rejectWithValue(error.message || 'Failed to create account');
+      }
     }
   }
 );
@@ -48,7 +82,16 @@ export const createAccount = createAsyncThunk(
 const accountsSlice = createSlice({
   name: 'accounts',
   initialState,
-  reducers: {},
+  reducers: {
+    // Add a reducer to clear errors if needed
+    clearError: (state) => {
+      state.error = null;
+    },
+    // Add a reducer to manually add account (for testing)
+    addAccountManually: (state, action) => {
+      state.accounts.push(action.payload);
+    }
+  },
   extraReducers: (builder) => {
     builder
       // Fetch Accounts
@@ -80,4 +123,6 @@ const accountsSlice = createSlice({
   },
 });
 
+// Export the new actions
+export const { clearError, addAccountManually } = accountsSlice.actions;
 export default accountsSlice.reducer;

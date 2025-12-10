@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { groupsAPI } from '../../services/api';
+import axios from 'axios';
 
 interface Group {
   id: string;
@@ -32,6 +32,36 @@ interface GroupExpense {
   createdAt: string;
   updatedAt: string;
 }
+
+// Create axios instance with base configuration
+const axiosInstance = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000/api',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Add token to requests if available
+axiosInstance.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Create groupsAPI object using axiosInstance
+const groupsAPI = {
+  getUserGroups: (userId: string) => axiosInstance.get(`/groups/user/${userId}`),
+  createGroup: (groupData: any) => axiosInstance.post('/groups', groupData),
+  getGroup: (groupId: string) => axiosInstance.get(`/groups/${groupId}`),
+  addMember: (groupId: string, userId: string, role: string) => 
+    axiosInstance.post(`/groups/${groupId}/members`, { userId, role }),
+  getGroupBalance: (groupId: string) => axiosInstance.get(`/groups/${groupId}/balance`),
+  createGroupExpense: (groupId: string, expenseData: any) => 
+    axiosInstance.post(`/groups/${groupId}/expenses`, expenseData),
+  getGroupExpenses: (groupId: string) => axiosInstance.get(`/groups/${groupId}/expenses`)
+};
 
 const TestGroupsComprehensive: React.FC = () => {
   const [groups, setGroups] = useState<Group[]>([]);

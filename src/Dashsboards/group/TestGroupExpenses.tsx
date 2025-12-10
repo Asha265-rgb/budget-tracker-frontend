@@ -1,89 +1,73 @@
+// src/Dashsboards/group/TestGroupExpenses.tsx - FIXED VERSION
 import React, { useState, useEffect } from 'react';
-import { groupsAPI, groupExpensesAPI, groupMembersAPI } from '../../services/api';
+import { 
+  useGetGroupsQuery,
+  useGetGroupMembersQuery,
+  type Group,
+} from '../../features/groups/groupsApi';
 
-interface Group {
-  id: string;
-  name: string;
-}
+// Since useGetGroupExpensesQuery and useCreateGroupExpenseMutation don't exist yet,
+// we'll use the axios API directly
+import { expenseAPI } from '../../services/api';
 
-interface GroupMember {
-  id: string;
-  userId: string;
-  user?: {
-    firstName: string;
-    lastName: string;
-  };
-}
-
+// Define the GroupExpense type locally since it's not exported from groupsApi
 interface GroupExpense {
   id: string;
+  groupId: string;
   description: string;
   amount: number;
   category: string;
+  paidById: string;
+  splitMethod: string;
+  participants: string[];
+  amounts?: Record<string, number>;
   date: string;
-  splitType: string;
   status: string;
-  paidBy: string;
-  groupId: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 const TestGroupExpenses: React.FC = () => {
-  const [groups, setGroups] = useState<Group[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
-  const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
   const [expenses, setExpenses] = useState<GroupExpense[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string>('');
-  const [success, setSuccess] = useState<string>('');
-
+  const [loadingExpenses, setLoadingExpenses] = useState(false);
   const [expenseData, setExpenseData] = useState({
     description: '',
     amount: '',
     category: 'food',
-    splitType: 'equal'
+    splitType: 'equal' as 'equal' | 'unequal' | 'percentage' | 'custom'
   });
 
   const USER_ID = "437CCFD5-06CA-F011-B991-14F6D814225F";
 
-  // Fetch user's groups
-  const fetchUserGroups = async () => {
-    setLoading(true);
+  // RTK Query hooks
+  const { data: groups = [], isLoading: groupsLoading, refetch: refetchGroups } = useGetGroupsQuery();
+
+  const { data: groupMembers = [], isLoading: membersLoading } = useGetGroupMembersQuery(selectedGroupId, {
+    skip: !selectedGroupId
+  });
+
+  const [creatingExpense, setCreatingExpense] = useState(false);
+  const [error, setError] = useState<string>('');
+  const [success, setSuccess] = useState<string>('');
+
+  // Fetch expenses using axios API
+  const fetchExpenses = async () => {
+    if (!selectedGroupId) return;
+    
+    setLoadingExpenses(true);
     try {
-      const response = await groupsAPI.getUserGroups(USER_ID);
-      setGroups(response.data);
+      const response = await expenseAPI.getGroupExpenses(selectedGroupId);
+      setExpenses(response.data.expenses || []);
     } catch (err: any) {
-      setError(`Failed to fetch groups: ${err.response?.data?.message || err.message}`);
+      console.error('Failed to fetch expenses:', err);
+      setExpenses([]);
     } finally {
-      setLoading(false);
+      setLoadingExpenses(false);
     }
   };
 
-  // Fetch group members
-  const fetchGroupMembers = async (groupId: string) => {
-    if (!groupId) return;
-    try {
-      const response = await groupMembersAPI.getGroupMembers(groupId);
-      setGroupMembers(response.data);
-    } catch (err: any) {
-      console.error('Error fetching group members:', err);
-    }
-  };
-
-  // Fetch group expenses
-  const fetchGroupExpenses = async (groupId: string) => {
-    if (!groupId) return;
-    setLoading(true);
-    try {
-      const response = await groupExpensesAPI.getGroupExpenses(groupId);
-      setExpenses(response.data);
-    } catch (err: any) {
-      setError(`Failed to fetch expenses: ${err.response?.data?.message || err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Create test expense
+  // Create test expense using axios API
   const testCreateExpense = async () => {
     if (!selectedGroupId) {
       setError('Please select a group first');
@@ -95,65 +79,104 @@ const TestGroupExpenses: React.FC = () => {
       return;
     }
 
-    setLoading(true);
+    setError('');
+    setSuccess('');
+    setCreatingExpense(true);
+    
     try {
       const expense = {
         description: expenseData.description,
         amount: parseFloat(expenseData.amount),
         category: expenseData.category,
-        date: new Date().toISOString(),
-        splitType: expenseData.splitType,
-        paidBy: USER_ID,
-        groupId: selectedGroupId
+        splitMethod: expenseData.splitType,
+        paidById: USER_ID,
+        participants: groupMembers.map((m: any) => m.userId || m.id),
       };
 
-      const response = await groupExpensesAPI.createExpense(expense);
-      setSuccess(`Expense "${response.data.description}" created successfully!`);
+      await expenseAPI.createExpense(selectedGroupId, expense);
+      setSuccess(`Expense "${expense.description}" created successfully!`);
       setExpenseData({ description: '', amount: '', category: 'food', splitType: 'equal' });
-      await fetchGroupExpenses(selectedGroupId);
+      fetchExpenses(); // Refresh expenses
     } catch (err: any) {
-      setError(`Failed to create expense: ${err.response?.data?.message || err.message}`);
+      const errorMessage = err.response?.data?.message || err.message || 'Unknown error';
+      setError(`Failed to create expense: ${errorMessage}`);
     } finally {
-      setLoading(false);
+      setCreatingExpense(false);
     }
   };
 
+  // Auto-select first group on load
   useEffect(() => {
-    fetchUserGroups();
-  }, []);
+    if (groups.length > 0 && !selectedGroupId) {
+      setSelectedGroupId(groups[0].id);
+    }
+  }, [groups, selectedGroupId]);
 
+  // Fetch expenses when group changes
   useEffect(() => {
     if (selectedGroupId) {
-      fetchGroupMembers(selectedGroupId);
-      fetchGroupExpenses(selectedGroupId);
+      fetchExpenses();
     }
   }, [selectedGroupId]);
 
+  const loading = groupsLoading || membersLoading || loadingExpenses || creatingExpense;
+
   return (
     <div style={{ padding: '20px', border: '2px solid #10B981', margin: '10px', borderRadius: '8px' }}>
-      <h3>💸 Group Expenses API Test</h3>
+      <h3>💸 Group Expenses API Test (RTK Query + Axios)</h3>
 
       {/* Control Buttons */}
       <div style={{ marginBottom: '20px' }}>
-        <button onClick={fetchUserGroups} disabled={loading}>
+        <button 
+          onClick={() => refetchGroups()} 
+          disabled={groupsLoading} 
+          style={{ 
+            padding: '10px 15px', 
+            backgroundColor: '#10B981', 
+            color: 'white', 
+            border: 'none', 
+            borderRadius: '4px', 
+            cursor: groupsLoading ? 'not-allowed' : 'pointer',
+            marginRight: '10px'
+          }}
+        >
           🔄 Refresh Groups
+        </button>
+        <button 
+          onClick={fetchExpenses} 
+          disabled={!selectedGroupId || loadingExpenses} 
+          style={{ 
+            padding: '10px 15px', 
+            backgroundColor: '#3B82F6', 
+            color: 'white', 
+            border: 'none', 
+            borderRadius: '4px', 
+            cursor: !selectedGroupId || loadingExpenses ? 'not-allowed' : 'pointer'
+          }}
+        >
+          🔄 Refresh Expenses
         </button>
       </div>
 
       {loading && <p>Loading...</p>}
-      {error && <div style={{ color: 'red', marginBottom: '15px' }}>Error: {error}</div>}
-      {success && <div style={{ color: 'green', marginBottom: '15px' }}>Success: {success}</div>}
+      {error && <div style={{ color: 'red', marginBottom: '15px', padding: '10px', backgroundColor: '#ffe6e6', borderRadius: '4px' }}>Error: {error}</div>}
+      {success && <div style={{ color: 'green', marginBottom: '15px', padding: '10px', backgroundColor: '#e6ffe6', borderRadius: '4px' }}>Success: {success}</div>}
 
       {/* Group Selection */}
       <div style={{ marginBottom: '20px' }}>
-        <h4>Select Group</h4>
+        <h4>Select Group ({groups.length} available)</h4>
         <select 
           value={selectedGroupId} 
-          onChange={(e) => setSelectedGroupId(e.target.value)}
-          style={{ padding: '8px', width: '300px' }}
+          onChange={(e) => setSelectedGroupId(e.target.value)} 
+          style={{ 
+            padding: '8px', 
+            width: '300px', 
+            border: '1px solid #ddd', 
+            borderRadius: '4px' 
+          }}
         >
           <option value="">Select a group...</option>
-          {groups.map(group => (
+          {groups.map((group: Group) => (
             <option key={group.id} value={group.id}>{group.name}</option>
           ))}
         </select>
@@ -161,27 +184,43 @@ const TestGroupExpenses: React.FC = () => {
 
       {/* Create Expense Form */}
       {selectedGroupId && (
-        <div style={{ marginBottom: '20px', padding: '15px', border: '1px solid #ddd', borderRadius: '8px' }}>
+        <div style={{ marginBottom: '20px', padding: '15px', border: '1px solid #ddd', borderRadius: '8px', backgroundColor: '#f8f9fa' }}>
           <h4>Create New Expense</h4>
           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-            <input
-              type="text"
-              placeholder="Description"
-              value={expenseData.description}
-              onChange={(e) => setExpenseData({...expenseData, description: e.target.value})}
-              style={{ padding: '8px', width: '200px' }}
+            <input 
+              type="text" 
+              placeholder="Description" 
+              value={expenseData.description} 
+              onChange={(e) => setExpenseData({...expenseData, description: e.target.value})} 
+              style={{ 
+                padding: '8px', 
+                width: '200px', 
+                border: '1px solid #ddd', 
+                borderRadius: '4px' 
+              }} 
             />
-            <input
-              type="number"
-              placeholder="Amount"
-              value={expenseData.amount}
-              onChange={(e) => setExpenseData({...expenseData, amount: e.target.value})}
-              style={{ padding: '8px', width: '120px' }}
+            <input 
+              type="number" 
+              placeholder="Amount" 
+              value={expenseData.amount} 
+              onChange={(e) => setExpenseData({...expenseData, amount: e.target.value})} 
+              style={{ 
+                padding: '8px', 
+                width: '120px', 
+                border: '1px solid #ddd', 
+                borderRadius: '4px' 
+              }} 
+              min="0" 
+              step="0.01" 
             />
-            <select
-              value={expenseData.category}
-              onChange={(e) => setExpenseData({...expenseData, category: e.target.value})}
-              style={{ padding: '8px' }}
+            <select 
+              value={expenseData.category} 
+              onChange={(e) => setExpenseData({...expenseData, category: e.target.value})} 
+              style={{ 
+                padding: '8px', 
+                border: '1px solid #ddd', 
+                borderRadius: '4px' 
+              }}
             >
               <option value="food">Food</option>
               <option value="transport">Transport</option>
@@ -189,17 +228,32 @@ const TestGroupExpenses: React.FC = () => {
               <option value="utilities">Utilities</option>
               <option value="other">Other</option>
             </select>
-            <select
-              value={expenseData.splitType}
-              onChange={(e) => setExpenseData({...expenseData, splitType: e.target.value})}
-              style={{ padding: '8px' }}
+            <select 
+              value={expenseData.splitType} 
+              onChange={(e) => setExpenseData({...expenseData, splitType: e.target.value as 'equal' | 'unequal' | 'percentage' | 'custom'})} 
+              style={{ 
+                padding: '8px', 
+                border: '1px solid #ddd', 
+                borderRadius: '4px' 
+              }}
             >
               <option value="equal">Equal Split</option>
               <option value="percentage">Percentage</option>
               <option value="custom">Custom</option>
             </select>
-            <button onClick={testCreateExpense} disabled={loading}>
-              💰 Create Expense
+            <button 
+              onClick={testCreateExpense} 
+              disabled={loading || !expenseData.description || !expenseData.amount} 
+              style={{ 
+                padding: '8px 15px', 
+                backgroundColor: !expenseData.description || !expenseData.amount ? '#ccc' : '#10B981', 
+                color: 'white', 
+                border: 'none', 
+                borderRadius: '4px', 
+                cursor: !expenseData.description || !expenseData.amount ? 'not-allowed' : 'pointer' 
+              }}
+            >
+              {creatingExpense ? 'Creating...' : '💰 Create Expense'}
             </button>
           </div>
           <p style={{ fontSize: '12px', color: '#666', marginTop: '10px' }}>
@@ -212,38 +266,48 @@ const TestGroupExpenses: React.FC = () => {
       {selectedGroupId && (
         <div>
           <h4>Group Expenses ({expenses.length})</h4>
-          {expenses.length === 0 ? (
-            <p>No expenses found. Create an expense to see it here.</p>
+          {expenses.length === 0 && !loadingExpenses ? (
+            <p style={{ color: '#666', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '4px' }}>
+              No expenses found. Create an expense to see it here.
+            </p>
           ) : (
-            expenses.map(expense => (
-              <div key={expense.id} style={{ 
-                border: '1px solid #ddd', 
-                padding: '15px', 
-                margin: '10px 0',
-                borderRadius: '8px'
-              }}>
+            expenses.map((expense: GroupExpense) => (
+              <div 
+                key={expense.id} 
+                style={{ 
+                  border: '1px solid #ddd', 
+                  padding: '15px', 
+                  margin: '10px 0', 
+                  borderRadius: '8px', 
+                  backgroundColor: '#ffffff', 
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)' 
+                }}
+              >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
-                    <h5 style={{ margin: 0 }}>{expense.description}</h5>
+                    <h5 style={{ margin: 0, marginBottom: '5px' }}>{expense.description}</h5>
                     <p style={{ margin: '5px 0' }}>
-                      Amount: <strong>${expense.amount}</strong> | 
+                      Amount: <strong>${expense.amount.toFixed(2)}</strong> | 
                       Category: <strong>{expense.category}</strong> | 
-                      Split: <strong>{expense.splitType}</strong>
+                      Split: <strong>{expense.splitMethod || 'N/A'}</strong>
                     </p>
                     <p style={{ margin: 0, fontSize: '12px', color: '#666' }}>
-                      Date: {new Date(expense.date).toLocaleDateString()} | 
-                      Status: {expense.status} | 
-                      Paid by: {expense.paidBy}
+                      Date: {new Date(expense.date || expense.createdAt).toLocaleDateString()} | 
+                      Status: {expense.status || 'N/A'} | 
+                      Paid by: {expense.paidById || 'N/A'}
                     </p>
                   </div>
-                  <span style={{ 
-                    padding: '4px 8px',
-                    backgroundColor: expense.status === 'pending' ? '#F59E0B' : '#10B981',
-                    color: 'white',
-                    borderRadius: '4px',
-                    fontSize: '12px'
-                  }}>
-                    {expense.status}
+                  <span 
+                    style={{ 
+                      padding: '4px 8px', 
+                      backgroundColor: expense.status === 'pending' ? '#F59E0B' : '#10B981', 
+                      color: 'white', 
+                      borderRadius: '4px', 
+                      fontSize: '12px', 
+                      fontWeight: 'bold' 
+                    }}
+                  >
+                    {expense.status || 'N/A'}
                   </span>
                 </div>
               </div>

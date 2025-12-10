@@ -1,162 +1,133 @@
-import React, { useState, useEffect } from 'react';
-import { goalsAPI } from '../services/api';
-
-interface Goal {
-  id: string;
-  name: string;
-  targetAmount: number;
-  currentAmount: number;
-  targetDate: string;
-  startDate: string;
-  status: string;
-  category?: string;
-  color?: string;
-  icon?: string;
-  userId: string;
-}
+import React, { useState } from 'react';
+import { 
+  useGetGoalsQuery, 
+  useCreateGoalMutation,
+  useAddSavingsMutation,
+  type Goal
+} from '../features/goals/goalsApi'; // Changed import location
 
 const TestGoals: React.FC = () => {
-  const [goals, setGoals] = useState<Goal[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
+  const USER_ID = "437CCFD5-06CA-F011-B991-14F6D814225F";
+  
+  // RTK Query hooks
+  const { data: goals = [], isLoading: goalsLoading, refetch: refetchGoals } = useGetGoalsQuery(USER_ID);
+  const [createGoal, { isLoading: creatingGoal }] = useCreateGoalMutation();
+  const [addSavings, { isLoading: addingSavings }] = useAddSavingsMutation();
+  
   const [error, setError] = useState<string>('');
+  const [success, setSuccess] = useState<string>('');
 
-  const USER_ID = "437CCFD5-06CA-F011-B991-14F6D814225F"; // Your user ID
-
-  // Test data for creating goals
+  // Test data for creating goals - Updated to match your CreateGoalDto interface
   const testVacationGoal = {
     name: "Hawaii Vacation",
     targetAmount: 2000.00,
-    currentAmount: 0,
     targetDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
     startDate: new Date().toISOString(),
     category: "vacation",
     color: "#4CAF50",
     icon: "🏝️",
+    isUnrealistic: false,
     userId: USER_ID
   };
 
   const testCarGoal = {
     name: "New Car Down Payment", 
     targetAmount: 5000.00,
-    currentAmount: 0,
     targetDate: new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString(),
     startDate: new Date().toISOString(),
     category: "car",
     color: "#2196F3",
     icon: "🚗",
+    isUnrealistic: false,
     userId: USER_ID
   };
 
   const testEmergencyFundGoal = {
     name: "Emergency Fund",
     targetAmount: 10000.00,
-    currentAmount: 0,
     targetDate: new Date(new Date().setFullYear(new Date().getFullYear() + 3)).toISOString(),
     startDate: new Date().toISOString(),
     category: "savings",
     color: "#FF9800",
     icon: "🛡️",
+    isUnrealistic: false,
     userId: USER_ID
-  };
-
-  // Test: Get all goals for user
-  const testGetGoals = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const response = await goalsAPI.getUserGoals(USER_ID);
-      setGoals(response.data);
-      console.log('Goals:', response.data);
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.message || error.message || 'Unknown error';
-      setError(`Error fetching goals: ${errorMessage}`);
-      console.error('Error fetching goals:', error);
-    } finally {
-      setLoading(false);
-    }
   };
 
   // Test: Create vacation goal
   const testCreateVacationGoal = async () => {
     setError('');
+    setSuccess('');
     try {
-      console.log('Creating vacation goal with data:', testVacationGoal);
-      const response = await goalsAPI.createGoal(testVacationGoal);
-      console.log('Vacation goal created:', response.data);
-      alert('Vacation goal created successfully!');
-      testGetGoals(); // Refresh the list
+      await createGoal(testVacationGoal).unwrap();
+      setSuccess('Vacation goal created successfully!');
+      refetchGoals();
     } catch (error: any) {
-      const errorMessage = error.response?.data?.message || error.message || 'Unknown error';
+      const errorMessage = error.data?.message || error.message || 'Unknown error';
       setError(`Error creating vacation goal: ${errorMessage}`);
       console.error('Error creating vacation goal:', error);
-      alert(`Error: ${errorMessage}`);
     }
   };
 
   // Test: Create car goal
   const testCreateCarGoal = async () => {
     setError('');
+    setSuccess('');
     try {
-      console.log('Creating car goal with data:', testCarGoal);
-      const response = await goalsAPI.createGoal(testCarGoal);
-      console.log('Car goal created:', response.data);
-      alert('Car goal created successfully!');
-      testGetGoals(); // Refresh the list
+      await createGoal(testCarGoal).unwrap();
+      setSuccess('Car goal created successfully!');
+      refetchGoals();
     } catch (error: any) {
-      const errorMessage = error.response?.data?.message || error.message || 'Unknown error';
+      const errorMessage = error.data?.message || error.message || 'Unknown error';
       setError(`Error creating car goal: ${errorMessage}`);
       console.error('Error creating car goal:', error);
-      alert(`Error: ${errorMessage}`);
     }
   };
 
   // Test: Create emergency fund goal
   const testCreateEmergencyFundGoal = async () => {
     setError('');
+    setSuccess('');
     try {
-      console.log('Creating emergency fund goal with data:', testEmergencyFundGoal);
-      const response = await goalsAPI.createGoal(testEmergencyFundGoal);
-      console.log('Emergency fund goal created:', response.data);
-      alert('Emergency fund goal created successfully!');
-      testGetGoals(); // Refresh the list
+      await createGoal(testEmergencyFundGoal).unwrap();
+      setSuccess('Emergency fund goal created successfully!');
+      refetchGoals();
     } catch (error: any) {
-      const errorMessage = error.response?.data?.message || error.message || 'Unknown error';
+      const errorMessage = error.data?.message || error.message || 'Unknown error';
       setError(`Error creating emergency fund goal: ${errorMessage}`);
       console.error('Error creating emergency fund goal:', error);
-      alert(`Error: ${errorMessage}`);
     }
   };
 
-  // Test: Add money to first goal
+  // Test: Add money to first goal - FIXED to match your API signature
   const testAddToGoal = async () => {
     if (goals.length === 0) {
-      alert('No goals found. Please create a goal first.');
+      setError('No goals found. Please create a goal first.');
       return;
     }
 
     const goal = goals[0]; // Use first goal
     const amount = 500; // Add $500
 
+    setError('');
+    setSuccess('');
     try {
-      // This would require a PATCH endpoint - for now we'll just show the calculation
-      const newAmount = goal.currentAmount + amount;
-      const newProgress = (newAmount / goal.targetAmount) * 100;
+      await addSavings({
+        goalId: goal.id,
+        savings: {
+          amount: amount,
+          notes: "Test savings"
+        }
+      }).unwrap();
       
-      alert(`Added $${amount} to "${goal.name}"\nNew total: $${newAmount}\nProgress: ${newProgress.toFixed(1)}%`);
-      
-      console.log(`Would update goal ${goal.id} with +$${amount}`);
-      
-      // Refresh to see if backend auto-updates
-      testGetGoals();
+      setSuccess(`Added $${amount} to "${goal.name}"`);
+      refetchGoals();
     } catch (error: any) {
+      const errorMessage = error.data?.message || error.message || 'Unknown error';
+      setError(`Error adding to goal: ${errorMessage}`);
       console.error('Error adding to goal:', error);
-      alert('Error adding to goal. Check console for details.');
     }
   };
-
-  useEffect(() => {
-    testGetGoals();
-  }, []);
 
   // Helper functions for goal calculations
   const getProgressPercentage = (goal: Goal) => {
@@ -190,45 +161,129 @@ const TestGoals: React.FC = () => {
   };
 
   return (
-    <div style={{ padding: '20px', border: '1px solid #ccc', margin: '10px' }}>
-      <h3>🎯 Goals API Test</h3>
+    <div style={{ padding: '20px', border: '2px solid #4CAF50', margin: '10px', borderRadius: '8px' }}>
+      <h3>🎯 Goals API Test (RTK Query)</h3>
       
-      <div style={{ marginBottom: '20px', padding: '10px', backgroundColor: '#f0f0f0' }}>
+      <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f0f0f0', borderRadius: '8px' }}>
         <p><strong>User ID:</strong> {USER_ID}</p>
-        <p><small>Goals help you save for specific targets with visual progress tracking</small></p>
+        <p style={{ fontSize: '12px', margin: '5px 0' }}>Using RTK Query hooks for goals management</p>
       </div>
       
-      <div style={{ marginBottom: '20px' }}>
-        <button onClick={testCreateVacationGoal} style={{ marginRight: '10px', marginBottom: '10px' }}>
+      <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+        <button 
+          onClick={testCreateVacationGoal} 
+          disabled={creatingGoal}
+          style={{ 
+            padding: '10px 15px',
+            backgroundColor: creatingGoal ? '#ccc' : '#4CAF50',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: creatingGoal ? 'not-allowed' : 'pointer'
+          }}
+        >
           🏝️ Create Vacation Goal ($2,000)
         </button>
-        <button onClick={testCreateCarGoal} style={{ marginRight: '10px', marginBottom: '10px' }}>
+        <button 
+          onClick={testCreateCarGoal} 
+          disabled={creatingGoal}
+          style={{ 
+            padding: '10px 15px',
+            backgroundColor: creatingGoal ? '#ccc' : '#2196F3',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: creatingGoal ? 'not-allowed' : 'pointer'
+          }}
+        >
           🚗 Create Car Goal ($5,000)
         </button>
-        <button onClick={testCreateEmergencyFundGoal} style={{ marginRight: '10px', marginBottom: '10px' }}>
+        <button 
+          onClick={testCreateEmergencyFundGoal} 
+          disabled={creatingGoal}
+          style={{ 
+            padding: '10px 15px',
+            backgroundColor: creatingGoal ? '#ccc' : '#FF9800',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: creatingGoal ? 'not-allowed' : 'pointer'
+          }}
+        >
           🛡️ Create Emergency Fund ($10,000)
         </button>
-        <button onClick={testAddToGoal} style={{ marginRight: '10px', marginBottom: '10px' }}>
+        <button 
+          onClick={testAddToGoal} 
+          disabled={addingSavings || goals.length === 0}
+          style={{ 
+            padding: '10px 15px',
+            backgroundColor: addingSavings || goals.length === 0 ? '#ccc' : '#9C27B0',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: addingSavings || goals.length === 0 ? 'not-allowed' : 'pointer'
+          }}
+        >
           💰 Add $500 to First Goal
         </button>
-        <button onClick={testGetGoals}>
+        <button 
+          onClick={refetchGoals} 
+          disabled={goalsLoading}
+          style={{ 
+            padding: '10px 15px',
+            backgroundColor: goalsLoading ? '#ccc' : '#607D8B',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: goalsLoading ? 'not-allowed' : 'pointer'
+          }}
+        >
           🔄 Refresh Goals
         </button>
       </div>
 
-      {loading && <p>Loading...</p>}
+      {(goalsLoading || creatingGoal || addingSavings) && (
+        <p style={{ color: '#666', textAlign: 'center' }}>Loading...</p>
+      )}
       {error && (
-        <div style={{ color: 'red', marginBottom: '15px', padding: '10px', backgroundColor: '#ffe6e6' }}>
+        <div style={{ 
+          color: '#d32f2f', 
+          marginBottom: '15px', 
+          padding: '10px', 
+          backgroundColor: '#ffebee',
+          borderRadius: '4px',
+          border: '1px solid #ef5350'
+        }}>
           <strong>Error:</strong> {error}
+        </div>
+      )}
+      {success && (
+        <div style={{ 
+          color: '#388e3c', 
+          marginBottom: '15px', 
+          padding: '10px', 
+          backgroundColor: '#e8f5e9',
+          borderRadius: '4px',
+          border: '1px solid #66bb6a'
+        }}>
+          <strong>Success:</strong> {success}
         </div>
       )}
       
       <div>
         <h4>Goals List ({goals.length})</h4>
-        {goals.length === 0 && !loading && (
-          <p style={{ color: '#666' }}>No goals found. Create some goals to see them here.</p>
+        {goals.length === 0 && !goalsLoading && (
+          <p style={{ 
+            color: '#666', 
+            padding: '20px', 
+            textAlign: 'center', 
+            backgroundColor: '#f8f9fa', 
+            borderRadius: '4px' 
+          }}>
+            No goals found. Create some goals to see them here.
+          </p>
         )}
-        {goals.map(goal => {
+        {(goals as Goal[]).map(goal => {
           const progress = getProgressPercentage(goal);
           const daysRemaining = getDaysRemaining(goal);
           const monthlySavings = getMonthlySavingsNeeded(goal);
@@ -239,19 +294,20 @@ const TestGoals: React.FC = () => {
               border: '1px solid #eee', 
               margin: '15px 0', 
               padding: '20px',
-              backgroundColor: '#f9f9f9',
-              borderRadius: '8px'
+              backgroundColor: '#ffffff',
+              borderRadius: '8px',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ fontSize: '24px' }}>{goal.icon || '🎯'}</span>
+                  <span style={{ fontSize: '32px' }}>{goal.icon || '🎯'}</span>
                   <div>
                     <h4 style={{ margin: 0, color: goal.color || '#333' }}>{goal.name}</h4>
-                    <p style={{ margin: 0, color: '#666', fontSize: '14px' }}>{goal.category}</p>
+                    <p style={{ margin: '3px 0', color: '#666', fontSize: '14px' }}>{goal.category}</p>
                   </div>
                 </div>
                 <span style={{ 
-                  padding: '4px 12px', 
+                  padding: '6px 14px', 
                   backgroundColor: getStatusColor(goal.status),
                   color: 'white',
                   borderRadius: '20px',
@@ -265,18 +321,18 @@ const TestGoals: React.FC = () => {
               {/* Progress Bar */}
               <div style={{ marginBottom: '15px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span style={{ fontWeight: 'bold' }}>
+                  <span style={{ fontWeight: 'bold', fontSize: '16px' }}>
                     ${goal.currentAmount.toFixed(2)} / ${goal.targetAmount.toFixed(2)}
                   </span>
-                  <span style={{ fontWeight: 'bold', color: isCompleted ? '#4CAF50' : '#333' }}>
+                  <span style={{ fontWeight: 'bold', fontSize: '16px', color: isCompleted ? '#4CAF50' : '#333' }}>
                     {progress.toFixed(1)}%
                   </span>
                 </div>
                 <div style={{
                   width: '100%',
-                  height: '12px',
+                  height: '14px',
                   backgroundColor: '#e0e0e0',
-                  borderRadius: '6px',
+                  borderRadius: '7px',
                   overflow: 'hidden'
                 }}>
                   <div style={{
@@ -284,7 +340,7 @@ const TestGoals: React.FC = () => {
                     height: '100%',
                     backgroundColor: goal.color || '#4CAF50',
                     transition: 'width 0.3s ease',
-                    borderRadius: '6px'
+                    borderRadius: '7px'
                   }} />
                 </div>
               </div>
@@ -295,16 +351,16 @@ const TestGoals: React.FC = () => {
                 gridTemplateColumns: '1fr 1fr', 
                 gap: '15px', 
                 fontSize: '14px',
-                backgroundColor: 'white',
+                backgroundColor: '#f8f9fa',
                 padding: '15px',
                 borderRadius: '6px',
-                border: '1px solid #eee'
+                border: '1px solid #e0e0e0'
               }}>
                 <div>
                   <strong>Remaining:</strong> ${(goal.targetAmount - goal.currentAmount).toFixed(2)}
                 </div>
                 <div>
-                  <strong>Days Left:</strong> {daysRemaining}
+                  <strong>Days Left:</strong> {daysRemaining > 0 ? daysRemaining : 'Overdue'}
                 </div>
                 <div>
                   <strong>Monthly Needed:</strong> ${monthlySavings.toFixed(2)}
@@ -316,16 +372,17 @@ const TestGoals: React.FC = () => {
               
               {isCompleted && (
                 <div style={{
-                  marginTop: '10px',
-                  padding: '10px',
+                  marginTop: '15px',
+                  padding: '12px',
                   backgroundColor: '#E8F5E8',
-                  border: '1px solid #4CAF50',
+                  border: '2px solid #4CAF50',
                   borderRadius: '6px',
                   textAlign: 'center',
                   fontWeight: 'bold',
+                  fontSize: '15px',
                   color: '#2E7D32'
                 }}>
-                  🎉 Goal Completed! Congratulations!
+                  🎉 Goal Completed! Congratulations! 🎉
                 </div>
               )}
             </div>

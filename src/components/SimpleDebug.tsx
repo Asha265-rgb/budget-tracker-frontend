@@ -1,45 +1,27 @@
 import React, { useState } from 'react';
-import { usersAPI, accountsAPI } from '../services/api';
+import { useSelector } from 'react-redux';
+import { useGetProfileQuery } from '../features/user/userApi';
+import { useGetAccountsQuery } from '../features/accounts/accountsApi';
+import type { RootState } from '../app/store';
 
 const SimpleDebug: React.FC = () => {
-  const [userInfo, setUserInfo] = useState<any>(null);
-  const [accounts, setAccounts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const { user } = useSelector((state: RootState) => state.auth);
+  const { data: userData, isLoading: userLoading, refetch: refetchUser } = useGetProfileQuery();
+  const { data: accounts = [], isLoading: accountsLoading, refetch: refetchAccounts } = useGetAccountsQuery(user?.id || '');
   const [showDebug, setShowDebug] = useState(false);
-
-  // Get user profile and accounts only when manually triggered
-  const fetchUserData = async () => {
-    setLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        console.log('No token found - please login first');
-        return;
-      }
-
-      // Get user profile
-      const userResponse = await usersAPI.getProfile();
-      const user = userResponse.data;
-      setUserInfo(user);
-      
-      // Get user's accounts
-      const accountsResponse = await accountsAPI.getAccounts(user.id);
-      setAccounts(accountsResponse.data);
-      
-      console.log('User Info:', user);
-      console.log('Accounts:', accountsResponse.data);
-    } catch (error: any) {
-      console.error('Error fetching user data:', error.response?.data || error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Check what's in localStorage
   const checkStorage = () => {
     const token = localStorage.getItem('token');
     console.log('Token in localStorage:', token);
     alert(`Token in storage: ${token ? 'YES' : 'NO'}`);
+  };
+
+  const fetchAllData = () => {
+    refetchUser();
+    if (user?.id) {
+      refetchAccounts();
+    }
   };
 
   return (
@@ -54,7 +36,7 @@ const SimpleDebug: React.FC = () => {
           Check Storage
         </button>
         {showDebug && (
-          <button onClick={fetchUserData}>
+          <button onClick={fetchAllData}>
             Load My Data
           </button>
         )}
@@ -62,18 +44,18 @@ const SimpleDebug: React.FC = () => {
 
       {showDebug && (
         <>
-          {loading && <p>Loading...</p>}
+          {(userLoading || accountsLoading) && <p>Loading...</p>}
 
           {/* User Information */}
-          {userInfo && (
+          {userData && (
             <div style={{ marginBottom: '20px', padding: '10px', border: '1px solid #ddd', backgroundColor: 'white' }}>
               <h4>👤 User Information</h4>
-              <p><strong>User ID:</strong> <span style={{ backgroundColor: '#e8f4fd', padding: '2px 6px', borderRadius: '3px' }}>{userInfo.id}</span></p>
-              <p><strong>Email:</strong> {userInfo.email}</p>
-              <p><strong>Name:</strong> {userInfo.firstName} {userInfo.lastName}</p>
+              <p><strong>User ID:</strong> <span style={{ backgroundColor: '#e8f4fd', padding: '2px 6px', borderRadius: '3px' }}>{userData.id}</span></p>
+              <p><strong>Email:</strong> {userData.email}</p>
+              <p><strong>Name:</strong> {userData.firstName} {userData.lastName}</p>
               <button 
                 onClick={() => {
-                  navigator.clipboard.writeText(userInfo.id);
+                  navigator.clipboard.writeText(userData.id);
                   alert('User ID copied!');
                 }}
                 style={{ marginTop: '5px', padding: '2px 8px', fontSize: '12px' }}
@@ -112,7 +94,7 @@ const SimpleDebug: React.FC = () => {
             </div>
           )}
 
-          {!userInfo && !loading && (
+          {!userData && !userLoading && !accountsLoading && (
             <div style={{ color: '#666', padding: '10px' }}>
               <p>Click "Load My Data" to fetch your user information and accounts.</p>
             </div>

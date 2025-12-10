@@ -1,41 +1,35 @@
-import React, { useState, useEffect } from 'react';
-import { recurringTransactionsAPI } from '../services/api';
+import React, { useState } from 'react';
+import { 
+  useGetRecurringTransactionsQuery,
+  useCreateRecurringTransactionMutation,
+  useGetUpcomingRecurringTransactionsQuery,
+  type RecurringTransaction
+} from '../features/transactions/transactionsApi'; // Changed import location
 
 // Add this constant at the top
 const API_BASE_URL = '/api';
 
-interface RecurringTransaction {
-  id: string;
-  description: string;
-  amount: number;
-  type: 'income' | 'expense';
-  category: string;
-  frequency: string;
-  startDate: string;
-  endDate?: string;
-  nextProcessingDate: string;
-  status: string;
-  accountId: string;
-  userId: string;
-}
-
 const TestRecurringTransactions: React.FC = () => {
-  const [recurringTransactions, setRecurringTransactions] = useState<RecurringTransaction[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string>('');
-  const [debugInfo, setDebugInfo] = useState<string>('');
-
   const USER_ID = "437CCFD5-06CA-F011-B991-14F6D814225F";
   const ACCOUNT_ID = "149C488C-B3CA-F011-B991-14F6D814225F";
+  
+  // RTK Query hooks
+  const { data: recurringTransactions = [], isLoading: transactionsLoading, refetch: refetchTransactions } = 
+    useGetRecurringTransactionsQuery(); // No parameter needed
+  const [createRecurringTransaction, { isLoading: creatingTransaction }] = useCreateRecurringTransactionMutation();
+  const { data: upcomingTransactions = [], isLoading: upcomingLoading } = 
+    useGetUpcomingRecurringTransactionsQuery(); // No parameter needed
+  
+  const [error, setError] = useState<string>('');
+  const [debugInfo, setDebugInfo] = useState<string>('');
 
   const testNetflixSubscription = {
     description: "Netflix Subscription",
     amount: 15.99,
-    type: "expense" as 'expense',
+    type: "expense" as const,
     category: "entertainment",
-    frequency: "monthly" as 'monthly',
+    frequency: "monthly" as const,
     startDate: new Date().toISOString(),
-    nextProcessingDate: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString(),
     accountId: ACCOUNT_ID,
     userId: USER_ID
   };
@@ -43,11 +37,10 @@ const TestRecurringTransactions: React.FC = () => {
   const testSalary = {
     description: "Monthly Salary",
     amount: 3000.00,
-    type: "income" as 'income',
+    type: "income" as const,
     category: "salary",
-    frequency: "monthly" as 'monthly',
+    frequency: "monthly" as const,
     startDate: new Date().toISOString(),
-    nextProcessingDate: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString(),
     accountId: ACCOUNT_ID,
     userId: USER_ID
   };
@@ -55,34 +48,12 @@ const TestRecurringTransactions: React.FC = () => {
   const testWeeklyCoffee = {
     description: "Weekly Coffee Budget",
     amount: 25.00,
-    type: "expense" as 'expense',
+    type: "expense" as const,
     category: "food",
-    frequency: "weekly" as 'weekly',
+    frequency: "weekly" as const,
     startDate: new Date().toISOString(),
-    nextProcessingDate: new Date(new Date().setDate(new Date().getDate() + 7)).toISOString(),
     accountId: ACCOUNT_ID,
     userId: USER_ID
-  };
-
-  // Test: Get all recurring transactions for user
-  const testGetRecurringTransactions = async () => {
-    setLoading(true);
-    setError('');
-    setDebugInfo('Fetching recurring transactions...');
-    try {
-      const response = await recurringTransactionsAPI.getUserRecurringTransactions(USER_ID);
-      setRecurringTransactions(response.data);
-      setDebugInfo(`Successfully fetched ${response.data.length} recurring transactions`);
-      console.log('Recurring Transactions:', response.data);
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.message || error.message || 'Unknown error';
-      const fullError = `GET Error: ${errorMessage}\nURL: /recurring-transactions/user/${USER_ID}\nStatus: ${error.response?.status}`;
-      setError(fullError);
-      setDebugInfo(`Failed to fetch: ${errorMessage}`);
-      console.error('Error fetching recurring transactions:', error);
-    } finally {
-      setLoading(false);
-    }
   };
 
   // Test: Create Netflix subscription
@@ -90,15 +61,12 @@ const TestRecurringTransactions: React.FC = () => {
     setError('');
     setDebugInfo('Creating Netflix subscription...');
     try {
-      console.log('Creating Netflix subscription with data:', testNetflixSubscription);
-      const response = await recurringTransactionsAPI.createRecurringTransaction(testNetflixSubscription);
-      console.log('Netflix subscription created:', response.data);
+      await createRecurringTransaction(testNetflixSubscription).unwrap();
       setDebugInfo('Netflix subscription created successfully!');
       alert('Netflix subscription created successfully!');
-      testGetRecurringTransactions();
     } catch (error: any) {
-      const errorMessage = error.response?.data?.message || error.message || 'Unknown error';
-      const fullError = `POST Error: ${errorMessage}\nURL: /recurring-transactions/user/${USER_ID}\nStatus: ${error.response?.status}`;
+      const errorMessage = error.data?.message || error.message || 'Unknown error';
+      const fullError = `POST Error: ${errorMessage}`;
       setError(fullError);
       setDebugInfo(`Failed to create: ${errorMessage}`);
       console.error('Error creating Netflix subscription:', error);
@@ -111,15 +79,12 @@ const TestRecurringTransactions: React.FC = () => {
     setError('');
     setDebugInfo('Creating monthly salary...');
     try {
-      console.log('Creating monthly salary with data:', testSalary);
-      const response = await recurringTransactionsAPI.createRecurringTransaction(testSalary);
-      console.log('Monthly salary created:', response.data);
+      await createRecurringTransaction(testSalary).unwrap();
       setDebugInfo('Monthly salary created successfully!');
       alert('Monthly salary created successfully!');
-      testGetRecurringTransactions();
     } catch (error: any) {
-      const errorMessage = error.response?.data?.message || error.message || 'Unknown error';
-      const fullError = `POST Error: ${errorMessage}\nURL: /recurring-transactions/user/${USER_ID}\nStatus: ${error.response?.status}`;
+      const errorMessage = error.data?.message || error.message || 'Unknown error';
+      const fullError = `POST Error: ${errorMessage}`;
       setError(fullError);
       setDebugInfo(`Failed to create: ${errorMessage}`);
       console.error('Error creating monthly salary:', error);
@@ -132,15 +97,12 @@ const TestRecurringTransactions: React.FC = () => {
     setError('');
     setDebugInfo('Creating weekly coffee budget...');
     try {
-      console.log('Creating weekly coffee budget with data:', testWeeklyCoffee);
-      const response = await recurringTransactionsAPI.createRecurringTransaction(testWeeklyCoffee);
-      console.log('Weekly coffee budget created:', response.data);
+      await createRecurringTransaction(testWeeklyCoffee).unwrap();
       setDebugInfo('Weekly coffee budget created successfully!');
       alert('Weekly coffee budget created successfully!');
-      testGetRecurringTransactions();
     } catch (error: any) {
-      const errorMessage = error.response?.data?.message || error.message || 'Unknown error';
-      const fullError = `POST Error: ${errorMessage}\nURL: /recurring-transactions/user/${USER_ID}\nStatus: ${error.response?.status}`;
+      const errorMessage = error.data?.message || error.message || 'Unknown error';
+      const fullError = `POST Error: ${errorMessage}`;
       setError(fullError);
       setDebugInfo(`Failed to create: ${errorMessage}`);
       console.error('Error creating weekly coffee budget:', error);
@@ -149,29 +111,20 @@ const TestRecurringTransactions: React.FC = () => {
   };
 
   // Test: Get upcoming recurring transactions
-  const testGetUpcomingTransactions = async () => {
-    setError('');
-    setDebugInfo('Fetching upcoming transactions...');
-    try {
-      const response = await recurringTransactionsAPI.getUpcomingRecurringTransactions(USER_ID, 30);
-      setDebugInfo(`Found ${response.data.length} upcoming transactions in next 30 days`);
-      alert(`Found ${response.data.length} upcoming recurring transactions in the next 30 days!`);
-      console.log('Upcoming Transactions:', response.data);
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.message || error.message || 'Unknown error';
-      setDebugInfo(`Failed to fetch upcoming: ${errorMessage}`);
-      console.error('Error fetching upcoming transactions:', error);
-      alert(`Error fetching upcoming: ${errorMessage}`);
-    }
+  const testGetUpcomingTransactions = () => {
+    const count = upcomingTransactions.length || 0;
+    setDebugInfo(`Found ${count} upcoming transactions in next 30 days`);
+    alert(`Found ${count} upcoming recurring transactions in the next 30 days!`);
+    console.log('Upcoming Transactions:', upcomingTransactions);
   };
 
   // Test if endpoints exist
   const testEndpoints = async () => {
     setDebugInfo('Testing endpoints...');
     const endpoints = [
-      `/recurring-transactions/user/${USER_ID}`,
-      `/recurring-transactions/upcoming/user/${USER_ID}`,
-      '/recurring-transactions' // This should return 404
+      `/transactions/recurring`,
+      `/transactions/recurring/upcoming`,
+      '/transactions/recurring'
     ];
     
     let results = 'Endpoint Test Results:\n\n';
@@ -194,10 +147,6 @@ const TestRecurringTransactions: React.FC = () => {
     setDebugInfo(results);
   };
 
-  useEffect(() => {
-    testGetRecurringTransactions();
-  }, []);
-
   // Helper functions
   const getFrequencyColor = (frequency: string) => {
     switch (frequency) {
@@ -219,7 +168,8 @@ const TestRecurringTransactions: React.FC = () => {
   };
 
   const getNextProcessingText = (transaction: RecurringTransaction) => {
-    const nextDate = new Date(transaction.nextProcessingDate);
+    const nextDateStr = transaction.nextProcessingDate || transaction.startDate;
+    const nextDate = new Date(nextDateStr);
     const today = new Date();
     const diffTime = nextDate.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -233,11 +183,12 @@ const TestRecurringTransactions: React.FC = () => {
 
   return (
     <div style={{ padding: '20px', border: '1px solid #ccc', margin: '10px' }}>
-      <h3>🔄 Recurring Transactions API Test</h3>
+      <h3>🔄 Recurring Transactions API Test (RTK Query)</h3>
       
       <div style={{ marginBottom: '20px', padding: '10px', backgroundColor: '#f0f0f0' }}>
         <p><strong>User ID:</strong> {USER_ID}</p>
         <p><strong>Account ID:</strong> {ACCOUNT_ID}</p>
+        <p><small>Using RTK Query hooks for recurring transactions</small></p>
       </div>
 
       {/* Debug Info Section */}
@@ -252,24 +203,43 @@ const TestRecurringTransactions: React.FC = () => {
       </div>
       
       <div style={{ marginBottom: '20px' }}>
-        <button onClick={testCreateNetflixSubscription} style={{ marginRight: '10px', marginBottom: '10px' }}>
+        <button 
+          onClick={testCreateNetflixSubscription} 
+          disabled={creatingTransaction}
+          style={{ marginRight: '10px', marginBottom: '10px' }}
+        >
           📺 Create Netflix Monthly ($15.99)
         </button>
-        <button onClick={testCreateSalary} style={{ marginRight: '10px', marginBottom: '10px' }}>
+        <button 
+          onClick={testCreateSalary} 
+          disabled={creatingTransaction}
+          style={{ marginRight: '10px', marginBottom: '10px' }}
+        >
           💰 Create Monthly Salary ($3,000)
         </button>
-        <button onClick={testCreateWeeklyCoffee} style={{ marginRight: '10px', marginBottom: '10px' }}>
+        <button 
+          onClick={testCreateWeeklyCoffee} 
+          disabled={creatingTransaction}
+          style={{ marginRight: '10px', marginBottom: '10px' }}
+        >
           ☕ Create Weekly Coffee ($25)
         </button>
-        <button onClick={testGetUpcomingTransactions} style={{ marginRight: '10px', marginBottom: '10px' }}>
+        <button 
+          onClick={testGetUpcomingTransactions} 
+          disabled={upcomingLoading}
+          style={{ marginRight: '10px', marginBottom: '10px' }}
+        >
           📅 Get Upcoming (30 days)
         </button>
-        <button onClick={testGetRecurringTransactions}>
+        <button 
+          onClick={refetchTransactions} 
+          disabled={transactionsLoading}
+        >
           🔄 Refresh List
         </button>
       </div>
 
-      {loading && <p>Loading...</p>}
+      {(transactionsLoading || creatingTransaction || upcomingLoading) && <p>Loading...</p>}
       {error && (
         <div style={{ color: 'red', marginBottom: '15px', padding: '10px', backgroundColor: '#ffe6e6' }}>
           <strong>Error Details:</strong> 
@@ -279,15 +249,16 @@ const TestRecurringTransactions: React.FC = () => {
       
       <div>
         <h4>Recurring Transactions ({recurringTransactions.length})</h4>
-        {recurringTransactions.length === 0 && !loading && (
+        {recurringTransactions.length === 0 && !transactionsLoading && (
           <div style={{ color: '#666', padding: '20px', textAlign: 'center', backgroundColor: '#f8f9fa' }}>
             <p>No recurring transactions found.</p>
             <p>Click "Create" buttons above to add some!</p>
           </div>
         )}
-        {recurringTransactions.map(transaction => {
+        {recurringTransactions.map((transaction: RecurringTransaction) => {
           const frequencyColor = getFrequencyColor(transaction.frequency);
-          const statusColor = getStatusColor(transaction.status);
+          const status = transaction.status || 'active';
+          const statusColor = getStatusColor(status);
           
           return (
             <div key={transaction.id} style={{ 
@@ -310,7 +281,7 @@ const TestRecurringTransactions: React.FC = () => {
                     fontWeight: 'bold',
                     color: transaction.type === 'income' ? '#4CAF50' : '#F44336'
                   }}>
-                    {transaction.type === 'income' ? '+' : '-'}${transaction.amount}
+                    {transaction.type === 'income' ? '+' : '-'}${transaction.amount.toFixed(2)}
                   </div>
                 </div>
               </div>
@@ -350,7 +321,7 @@ const TestRecurringTransactions: React.FC = () => {
                     fontSize: '12px',
                     fontWeight: 'bold'
                   }}>
-                    {transaction.status}
+                    {status}
                   </span>
                 </div>
                 <div>
